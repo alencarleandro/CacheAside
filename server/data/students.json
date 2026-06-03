@@ -1,0 +1,53 @@
+{
+  "nextId": 7,
+  "students": [
+    {
+      "id": 1,
+      "name": "Ana Beatriz Souza",
+      "email": "ana.souza@pucminas.br",
+      "course": "Engenharia de Software",
+      "period": 5,
+      "gradeAverage": 8.7
+    },
+    {
+      "id": 2,
+      "name": "Bruno Lima",
+      "email": "bruno.lima@pucminas.br",
+      "course": "Sistemas de Informacao",
+      "period": 6,
+      "gradeAverage": 7.9
+    },
+    {
+      "id": 3,
+      "name": "Carla Mendes",
+      "email": "carla.mendes@pucminas.br",
+      "course": "Ciencia da Computacao",
+      "period": 4,
+      "gradeAverage": 9.1
+    },
+    {
+      "id": 4,
+      "name": "Diego Rocha",
+      "email": "diego.rocha@pucminas.br",
+      "course": "Engenharia de Software",
+      "period": 7,
+      "gradeAverage": 8.2
+    },
+    {
+      "id": 5,
+      "name": "Fernanda Alves",
+      "email": "fernanda.alves@pucminas.br",
+      "course": "Sistemas de Informacao",
+      "period": 3,
+      "gradeAverage": 8.9
+    },
+    {
+      "id": 6,
+      "name": "Gabriel Nunes",
+      "email": "gabriel.nunes@pucminas.br",
+      "course": "Engenharia de Computacao",
+      "period": 8,
+      "gradeAverage": 7.6
+    }
+  ]
+}
