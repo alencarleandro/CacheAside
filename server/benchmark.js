@@ -60,8 +60,8 @@ export async function runBenchmark(iterations = 12) {
   setCacheEnabled(previousCacheState);
 
   const improvementMs = withoutCache.avgMs - withCache.avgMs;
-  const improvementPercent = withoutCache.avgMs
-    ? round((improvementMs / withoutCache.avgMs) * 100)
+  const improvementPercent = withCache.avgMs
+    ? round((improvementMs / withCache.avgMs) * 100)
     : 0;
 
   const result = {
