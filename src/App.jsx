@@ -13,8 +13,14 @@ import {
   Search,
   Trash2
 } from 'lucide-react';
+import { HotTable } from '@handsontable/react-wrapper';
+import { registerAllModules } from 'handsontable/registry';
+import 'handsontable/styles/handsontable.min.css';
+import 'handsontable/styles/ht-theme-main.min.css';
 import { apiFetch } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
+
+registerAllModules();
 
 const emptyForm = {
   name: '',
@@ -58,6 +64,30 @@ function benchmarkSpeedup(benchmark) {
   const withoutCache = benchmark?.withoutCache?.avgMs ?? 0;
   const withCache = benchmark?.withCache?.avgMs ?? 0;
   return withCache ? withoutCache / withCache : 0;
+}
+
+function benchmarkEventType(type) {
+  if (type === 'cache-hit') return 'Hit';
+  if (type === 'cache-miss') return 'Miss';
+  if (type === 'database-read') return 'Banco';
+  return type;
+}
+
+function benchmarkEventTarget(message) {
+  return message.split(': ').slice(1).join(': ') || message;
+}
+
+function benchmarkEventResult(type) {
+  if (type === 'cache-hit') return 'Encontrou no cache';
+  if (type === 'cache-miss') return 'Nao encontrou no cache';
+  if (type === 'database-read') return 'Leu no banco';
+  return '-';
+}
+
+function benchmarkReadResult(read) {
+  if (read.cacheMatch === 'hit') return 'Hit no cache';
+  if (read.phase === 'sem cache') return 'Cache desligado';
+  return 'Miss no cache';
 }
 
 function sourceLabel(meta) {
@@ -280,9 +310,54 @@ function App() {
   }
 
   const visibleEvents = (metrics?.events ?? []).filter((event) => !hiddenEventTypes.has(event.type));
-  const benchmarkDetailEvents = (metrics?.events ?? [])
+  const eventTableData = (metrics?.events ?? [])
     .filter((event) => ['cache-hit', 'cache-miss', 'database-read'].includes(event.type))
-    .slice(0, 12);
+    .map((event) => [
+      new Date(event.at).toLocaleTimeString('pt-BR'),
+      benchmarkEventType(event.type),
+      benchmarkEventTarget(event.message),
+      benchmarkEventResult(event.type),
+      cache.backend ?? 'cache'
+    ]);
+  const readTableData = (benchmark?.reads ?? []).map((read) => [
+    read.phase,
+    read.readNumber,
+    formatMs(read.elapsedMs),
+    read.source === 'cache' ? 'cache' : 'banco',
+    benchmarkReadResult(read),
+    read.cacheBackend ?? '-',
+    read.cacheKey ?? '-'
+  ]);
+  const benchmarkTableData = readTableData.length ? readTableData : eventTableData;
+  const benchmarkTableHeaders = readTableData.length
+    ? ['Fase', 'Leitura', 'Tempo', 'Origem', 'Match', 'Backend', 'Chave']
+    : ['Hora', 'Tipo', 'Leitura', 'Resultado', 'Backend'];
+  const benchmarkTableColumns = readTableData.length
+    ? [
+        { readOnly: true, width: 110 },
+        { readOnly: true, width: 76 },
+        { readOnly: true, width: 90 },
+        { readOnly: true, width: 90 },
+        { readOnly: true, width: 130 },
+        { readOnly: true, width: 100 },
+        { readOnly: true, width: 150 }
+      ]
+    : [
+        { readOnly: true, width: 88 },
+        { readOnly: true, width: 88 },
+        { readOnly: true, width: 210 },
+        { readOnly: true, width: 180 },
+        { readOnly: true, width: 100 }
+      ];
+  const benchmarkTableHits = readTableData.length
+    ? (benchmark?.reads ?? []).filter((read) => read.cacheMatch === 'hit').length
+    : (metrics?.cacheHits ?? 0);
+  const benchmarkTableMisses = readTableData.length
+    ? (benchmark?.reads ?? []).filter((read) => read.cacheMatch === 'miss' && read.phase === 'com cache').length
+    : (metrics?.cacheMisses ?? 0);
+  const benchmarkTableHitRate = benchmarkTableHits + benchmarkTableMisses
+    ? (benchmarkTableHits / (benchmarkTableHits + benchmarkTableMisses)) * 100
+    : 0;
   const totalBenchmarkRequests = (benchmark?.withoutCache?.requests ?? 0) + (benchmark?.withCache?.requests ?? 0);
   const benchmarkSpeedupFactor = benchmarkSpeedup(benchmark);
   const staleStatus = staleDemo?.repaired ? 'Cache limpo' : staleDemo?.stale ? 'Inconsistencia detectada' : 'Aguardando teste';
@@ -379,44 +454,25 @@ function App() {
 
           {benchmarkExpanded && (
             <div className="benchmark-details">
-              <div className="detail-metrics">
-                <div>
-                  <span>Sem cache</span>
-                  <strong>{benchmark?.withoutCache?.requests ?? 0}</strong>
-                </div>
-                <div>
-                  <span>Com cache</span>
-                  <strong>{benchmark?.withCache?.requests ?? 0}</strong>
-                </div>
-                <div>
-                  <span>Cache hits</span>
-                  <strong>{metrics?.cacheHits ?? 0}</strong>
-                </div>
-                <div>
-                  <span>Cache misses</span>
-                  <strong>{metrics?.cacheMisses ?? 0}</strong>
-                </div>
-                <div>
-                  <span>Taxa hit</span>
-                  <strong>{Number(metrics?.cacheHitRate ?? 0).toFixed(1)}%</strong>
-                </div>
-                <div>
-                  <span>Backend</span>
-                  <strong>{cache.backend ?? 'cache'}</strong>
-                </div>
+              <div className="benchmark-table-meta">
+                <span>{benchmarkTableData.length} registros</span>
+                <span>{benchmarkTableHits} hits</span>
+                <span>{benchmarkTableMisses} misses</span>
+                <span>{benchmarkTableHitRate.toFixed(1)}% hit</span>
               </div>
-
-              <ol className="benchmark-trace">
-                {benchmarkDetailEvents.map((event) => (
-                  <li key={event.id}>
-                    <span className={`event-dot event-${event.type}`} />
-                    <div>
-                      <strong>{event.message}</strong>
-                      <time>{new Date(event.at).toLocaleTimeString('pt-BR')}</time>
-                    </div>
-                  </li>
-                ))}
-              </ol>
+              <div className="benchmark-hot-table">
+                <HotTable
+                  data={benchmarkTableData}
+                  colHeaders={benchmarkTableHeaders}
+                  columns={benchmarkTableColumns}
+                  height={Math.min(360, Math.max(180, benchmarkTableData.length * 32 + 44))}
+                  stretchH="all"
+                  rowHeaders
+                  readOnly
+                  manualColumnResize
+                  licenseKey="non-commercial-and-evaluation"
+                />
+              </div>
             </div>
           )}
         </section>

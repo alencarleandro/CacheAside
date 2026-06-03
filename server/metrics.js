@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-const MAX_EVENTS = 18;
+const MAX_EVENTS = 120;
 
 function makeResponseBucket() {
   return {
