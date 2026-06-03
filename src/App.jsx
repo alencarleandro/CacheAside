@@ -1,15 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowRight,
-  AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Database,
-  PencilLine,
-  Play,
-  RefreshCcw,
-  Send,
-  Server
+  Play
 } from 'lucide-react';
 import { apiFetch } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
@@ -75,15 +68,6 @@ function readStudentLabel(read) {
   return read.studentName ? `${read.studentId} - ${read.studentName}` : read.studentId;
 }
 
-function formatGrade(value) {
-  return Number(value ?? 0).toFixed(1);
-}
-
-function nextDemoGrade(value) {
-  const grade = Number(value ?? 0);
-  return Number((grade >= 9.8 ? grade - 0.4 : grade + 0.4).toFixed(1));
-}
-
 function BenchmarkSearchCards({ groups }) {
   return (
     <div className="benchmark-search-list">
@@ -128,12 +112,9 @@ function App() {
   const [benchmarkExpanded, setBenchmarkExpanded] = useState(false);
   const [withoutCacheExpanded, setWithoutCacheExpanded] = useState(true);
   const [withCacheExpanded, setWithCacheExpanded] = useState(true);
-  const [staleDemo, setStaleDemo] = useState(null);
-  const [demoGradeInput, setDemoGradeInput] = useState('9.9');
   const [iterations, setIterations] = useState(INITIAL_BENCHMARK_REPETITIONS);
   const [loading, setLoading] = useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
-  const [tradeoffLoading, setTradeoffLoading] = useState(false);
   const [error, setError] = useState('');
 
   const benchmarkScale = useMemo(() => {
@@ -182,88 +163,6 @@ function App() {
     }
   }
 
-  async function resetTradeoffMap() {
-    setTradeoffLoading(true);
-
-    try {
-      await handleAction(async () => {
-        const payload = await apiFetch('/cache/clear', { method: 'POST' });
-        setCache(payload.data);
-        setStaleDemo(null);
-        setDemoGradeInput('9.9');
-      });
-    } finally {
-      setTradeoffLoading(false);
-    }
-  }
-
-  async function primeTradeoffCache() {
-    setTradeoffLoading(true);
-
-    try {
-      await handleAction(async () => {
-        const payload = await apiFetch('/cache/stale-demo/prime', {
-          method: 'POST',
-          body: { studentId: staleDemo?.studentId }
-        });
-        const nextGrade = nextDemoGrade(payload.data.primedRead.gradeAverage);
-        setStaleDemo(payload.data);
-        setDemoGradeInput(formatGrade(nextGrade));
-        setCache((current) => ({ ...current, enabled: true }));
-      });
-    } finally {
-      setTradeoffLoading(false);
-    }
-  }
-
-  async function editTradeoffDatabase() {
-    const studentId = staleDemo?.studentId;
-    if (!studentId) return;
-
-    setTradeoffLoading(true);
-
-    try {
-      await handleAction(async () => {
-        const payload = await apiFetch('/cache/stale-demo/edit', {
-          method: 'POST',
-          body: {
-            studentId,
-            gradeAverage: demoGradeInput
-          }
-        });
-        setStaleDemo((current) => ({
-          ...(current ?? {}),
-          ...payload.data,
-          stale: false
-        }));
-      });
-    } finally {
-      setTradeoffLoading(false);
-    }
-  }
-
-  async function requestTradeoffAgain() {
-    const studentId = staleDemo?.studentId;
-    if (!studentId) return;
-
-    setTradeoffLoading(true);
-
-    try {
-      await handleAction(async () => {
-        const payload = await apiFetch('/cache/stale-demo/read', {
-          method: 'POST',
-          body: { studentId }
-        });
-        setStaleDemo((current) => ({
-          ...(current ?? {}),
-          ...payload.data
-        }));
-      });
-    } finally {
-      setTradeoffLoading(false);
-    }
-  }
-
   async function executeBenchmark(nextIterations = iterations) {
     setBenchmarkLoading(true);
 
@@ -303,66 +202,6 @@ function App() {
   const withoutCacheTotalMs = benchmarkTotalMs(benchmark?.withoutCache);
   const withCacheTotalMs = benchmarkTotalMs(benchmark?.withCache);
   const totalImprovementMs = withoutCacheTotalMs - withCacheTotalMs;
-  const hasPrimedRead = Boolean(staleDemo?.primedRead);
-  const hasDatabaseWrite = Boolean(staleDemo?.databaseWrite);
-  const hasCacheRead = Boolean(staleDemo?.cacheRead);
-  const hasStaleRisk = Boolean(staleDemo?.stale);
-  const targetStudent = staleDemo?.student
-    ?? staleDemo?.databaseStudent
-    ?? students.find((student) => student.id === staleDemo?.studentId)
-    ?? students[0];
-  const targetStudentLabel = targetStudent ? `${targetStudent.id} - ${targetStudent.name}` : '-';
-  const tradeoffCacheKey = staleDemo?.cacheKey ?? (targetStudent ? `students:${targetStudent.id}` : '-');
-  const primedGrade = hasPrimedRead
-    ? formatGrade(staleDemo.primedRead.gradeAverage)
-    : targetStudent
-      ? formatGrade(targetStudent.gradeAverage)
-      : '-';
-  const cachedGrade = hasCacheRead
-    ? formatGrade(staleDemo.cacheRead.gradeAverage)
-    : hasPrimedRead
-      ? formatGrade(staleDemo.primedRead.gradeAverage)
-      : '-';
-  const writtenGrade = hasDatabaseWrite ? formatGrade(staleDemo.databaseWrite.gradeAverage) : '-';
-  const databaseGrade = staleDemo?.databaseRead
-    ? formatGrade(staleDemo.databaseRead.gradeAverage)
-    : hasDatabaseWrite
-      ? writtenGrade
-      : primedGrade;
-  const gradeDelta = staleDemo?.databaseRead && staleDemo?.cacheRead
-    ? Math.abs(Number(staleDemo.databaseRead.gradeAverage) - Number(staleDemo.cacheRead.gradeAverage)).toFixed(1)
-    : '0.0';
-  const tradeoffStage = hasStaleRisk
-    ? 'stale'
-    : hasCacheRead
-      ? 'checked'
-      : hasDatabaseWrite
-        ? 'edited'
-        : hasPrimedRead
-          ? 'primed'
-          : 'idle';
-  const staleStatus = {
-    idle: 'Comece no banco',
-    primed: 'Redis preenchido',
-    edited: 'Banco editado',
-    checked: 'Consistente',
-    stale: 'Cache antigo'
-  }[tradeoffStage];
-  const tradeoffOutcomeTitle = {
-    idle: 'Clique no bloco 1 para carregar o registro padrao.',
-    primed: 'Primeira requisicao buscou no banco e gravou no Redis.',
-    edited: 'Banco mudou, mas o Redis ainda guarda o CR antigo.',
-    checked: 'A nova requisicao esta consistente.',
-    stale: 'Tradeoff visivel: a API retornou o dado antigo do Redis.'
-  }[tradeoffStage];
-  const tradeoffOutcomeText = {
-    idle: 'O mapa mostra o caminho cache aside sem executar tudo de uma vez.',
-    primed: `Chave ${tradeoffCacheKey} preenchida com CR ${primedGrade}.`,
-    edited: `Banco agora esta em CR ${writtenGrade}; Redis continua em CR ${cachedGrade}.`,
-    checked: staleDemo?.explanation ?? 'Cache e banco retornaram o mesmo valor.',
-    stale: `Redis respondeu CR ${cachedGrade}, banco esta em CR ${databaseGrade}; diferenca de ${gradeDelta} CR.`
-  }[tradeoffStage];
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -548,145 +387,11 @@ function App() {
           </div>
         </section>
 
-        <section className={`surface consistency-panel ${tradeoffLoading ? 'is-loading' : ''}`} aria-busy={tradeoffLoading}>
-          {tradeoffLoading && (
-            <div className="benchmark-loading tradeoff-loading" role="status" aria-live="polite">
-              <div className="benchmark-spinner" />
-              <strong>Movendo o mapa</strong>
-              <span>Executando a etapa selecionada...</span>
-            </div>
-          )}
+        <section className="surface consistency-panel">
           <div className="section-heading">
             <div>
               <span className="eyebrow">Tradeoff</span>
-              <h2>Mapa cache aside</h2>
-            </div>
-            <button onClick={resetTradeoffMap} disabled={loading} title="Reiniciar mapa">
-              <RefreshCcw size={18} />
-              Reiniciar
-            </button>
-          </div>
-
-          <div className={`tradeoff-status ${hasStaleRisk ? 'is-stale' : tradeoffStage === 'checked' ? 'is-ok' : ''}`}>
-            <div>
-              <span>Aluno</span>
-              <strong>{targetStudentLabel}</strong>
-            </div>
-            <div>
-              <span>Chave Redis</span>
-              <strong>{tradeoffCacheKey}</strong>
-            </div>
-            <div>
-              <span>Status</span>
-              <strong>{staleStatus}</strong>
-            </div>
-          </div>
-
-          <div className="tradeoff-map">
-            <article className={`map-node is-database ${tradeoffStage === 'idle' ? 'is-active' : ''} ${hasPrimedRead ? 'is-done' : ''}`}>
-              <header>
-                <span>1</span>
-                <Database size={20} />
-                <b>Banco</b>
-              </header>
-              <strong>Registro padrao</strong>
-              <p title={targetStudentLabel}>{targetStudentLabel}</p>
-              <div className="map-value">
-                <span>CR</span>
-                <strong>{primedGrade}</strong>
-              </div>
-              <button className="primary-button map-action" onClick={primeTradeoffCache} disabled={loading || !students.length} title="Buscar no banco e preencher o Redis">
-                <Play size={17} />
-                {hasPrimedRead ? 'Buscar de novo' : 'Pegar do banco'}
-              </button>
-            </article>
-
-            <div className={`map-arrow ${hasPrimedRead ? 'is-active' : ''}`} aria-hidden="true">
-              <ArrowRight size={26} />
-              <span>miss + set</span>
-            </div>
-
-            <article className={`map-node is-redis ${hasPrimedRead ? 'is-done' : ''} ${hasStaleRisk ? 'is-stale' : ''}`}>
-              <header>
-                <span>2</span>
-                <Server size={20} />
-                <b>Redis</b>
-              </header>
-              <strong>Cache preenchido</strong>
-              <p title={tradeoffCacheKey}>{tradeoffCacheKey}</p>
-              <div className="map-value">
-                <span>CR salvo</span>
-                <strong>{cachedGrade}</strong>
-              </div>
-              <div className="map-chip">{hasPrimedRead ? 'hit pronto' : 'vazio'}</div>
-            </article>
-
-            <div className={`map-arrow ${hasDatabaseWrite ? 'is-active' : ''}`} aria-hidden="true">
-              <ArrowRight size={26} />
-              <span>banco muda</span>
-            </div>
-
-            <article className={`map-node is-edit ${hasPrimedRead && !hasDatabaseWrite ? 'is-active' : ''} ${hasDatabaseWrite ? 'is-done' : ''}`}>
-              <header>
-                <span>3</span>
-                <PencilLine size={20} />
-                <b>Editar</b>
-              </header>
-              <strong>Alterar so no banco</strong>
-              <p>Redis nao invalida nessa etapa.</p>
-              <div className="map-editor">
-                <label>
-                  Novo CR
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    value={demoGradeInput}
-                    onChange={(event) => setDemoGradeInput(event.target.value)}
-                    disabled={!hasPrimedRead || loading}
-                  />
-                </label>
-                <button className="map-action" onClick={editTradeoffDatabase} disabled={loading || !hasPrimedRead} title="Editar o CR direto no banco">
-                  <PencilLine size={17} />
-                  Editar
-                </button>
-              </div>
-              <div className="map-value">
-                <span>Banco</span>
-                <strong>{writtenGrade}</strong>
-              </div>
-            </article>
-
-            <div className={`map-arrow ${hasCacheRead ? 'is-active' : ''}`} aria-hidden="true">
-              <ArrowRight size={26} />
-              <span>request</span>
-            </div>
-
-            <article className={`map-node is-request ${hasDatabaseWrite && !hasCacheRead ? 'is-active' : ''} ${hasCacheRead && !hasStaleRisk ? 'is-done' : ''} ${hasStaleRisk ? 'is-stale' : ''}`}>
-              <header>
-                <span>4</span>
-                <Send size={20} />
-                <b>API</b>
-              </header>
-              <strong>Requisitar de novo</strong>
-              <p>{hasCacheRead ? `Fonte: ${staleDemo.cacheRead.source}` : 'A API consulta a mesma chave.'}</p>
-              <div className="map-value">
-                <span>Retorno</span>
-                <strong>{hasCacheRead ? cachedGrade : '-'}</strong>
-              </div>
-              <button className="primary-button map-action" onClick={requestTradeoffAgain} disabled={loading || !hasDatabaseWrite} title="Consultar a mesma chave novamente">
-                <Send size={17} />
-                Requisitar
-              </button>
-            </article>
-          </div>
-
-          <div className={`tradeoff-callout ${hasStaleRisk ? 'is-stale' : tradeoffStage === 'checked' ? 'is-ok' : ''}`}>
-            {hasStaleRisk ? <AlertTriangle size={22} /> : <Server size={22} />}
-            <div>
-              <strong>{tradeoffOutcomeTitle}</strong>
-              <span>{tradeoffOutcomeText}</span>
+              <h2>Tradeoff</h2>
             </div>
           </div>
         </section>
