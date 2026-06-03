@@ -16,20 +16,26 @@ async function timeCall(callback) {
 
 async function runPhase(iterations, studentId) {
   const times = [];
+  let studentRequests = 0;
+  let listRequests = 0;
 
   for (let index = 0; index < iterations; index += 1) {
     const readOne = await timeCall(() => getStudent(studentId));
     times.push(readOne);
+    studentRequests += 1;
 
     if (index % 3 === 0) {
       const readList = await timeCall(() => getStudents());
       times.push(readList);
+      listRequests += 1;
     }
   }
 
   const total = times.reduce((sum, value) => sum + value, 0);
   return {
     requests: times.length,
+    studentRequests,
+    listRequests,
     avgMs: round(total / times.length),
     minMs: round(Math.min(...times)),
     maxMs: round(Math.max(...times))

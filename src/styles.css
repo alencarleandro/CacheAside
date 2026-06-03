@@ -434,9 +434,16 @@ h2 {
 .benchmark-summary,
 .cache-state {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 18px;
+}
+
+.benchmark-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cache-state {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .benchmark-summary div,
