@@ -36,7 +36,7 @@ function startProcess(args) {
 }
 
 startProcess(['server/index.js']);
-startProcess([viteBin, '--host', '127.0.0.1']);
+startProcess([viteBin]);
 
 for (const child of processes) {
   child.on('exit', (code) => {
