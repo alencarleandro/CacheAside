@@ -348,7 +348,7 @@ function App() {
 
           <div className="benchmark-summary">
             <div>
-              <span>Leituras individuais</span>
+              <span>Leituras</span>
               <strong>{totalBenchmarkRequests}</strong>
             </div>
             <div>
