@@ -14,7 +14,8 @@ import {
   getStudents,
   patchStudent,
   removeStudent,
-  replaceStudent
+  replaceStudent,
+  simulateCacheInconsistency
 } from './studentsService.js';
 
 const app = express();
@@ -132,6 +133,10 @@ app.patch('/api/cache', asyncRoute(async (request) => {
 
 app.post('/api/cache/clear', asyncRoute(async () => ({
   data: await clearCache()
+})));
+
+app.post('/api/cache/stale-demo', asyncRoute(async (request) => ({
+  data: await simulateCacheInconsistency(request.body?.studentId)
 })));
 
 app.get('/api/metrics', asyncRoute(async () => ({

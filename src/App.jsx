@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Code2,
   Database,
@@ -53,10 +54,6 @@ function formatPercent(value) {
   return `${Number(value || 0).toFixed(1)}%`;
 }
 
-function formatInteger(value) {
-  return Number(value || 0).toLocaleString('pt-BR');
-}
-
 function sourceLabel(meta) {
   if (meta?.source === 'cache') return 'cache';
   if (meta?.source === 'database') return 'banco';
@@ -77,27 +74,6 @@ function MetricTile({ icon: Icon, label, value, tone = 'neutral' }) {
   );
 }
 
-function StatusPill({ label, value }) {
-  return (
-    <div className="status-pill">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function FlowStep({ number, title, detail, tone = 'default' }) {
-  return (
-    <article className={`flow-step tone-${tone}`}>
-      <span>{number}</span>
-      <div>
-        <strong>{title}</strong>
-        <small>{detail}</small>
-      </div>
-    </article>
-  );
-}
-
 function CodeBlock({ title, children }) {
   return (
     <article className="code-card">
@@ -112,17 +88,20 @@ function CodeBlock({ title, children }) {
   );
 }
 
-function ModuleNote({ measure, meaning }) {
+function FocusNote({ measure, result }) {
   return (
-    <div className="module-note">
-      <div>
-        <strong>Como mede</strong>
-        <span>{measure}</span>
-      </div>
-      <div>
-        <strong>O que mostra</strong>
-        <span>{meaning}</span>
-      </div>
+    <div className="focus-note">
+      <p><strong>Como mede:</strong> {measure}</p>
+      <p><strong>O que observar:</strong> {result}</p>
+    </div>
+  );
+}
+
+function ConsistencyValue({ label, value, tone = 'neutral' }) {
+  return (
+    <div className={`consistency-value tone-${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }
@@ -136,6 +115,7 @@ function App() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [lastRequest, setLastRequest] = useState(null);
   const [benchmark, setBenchmark] = useState(null);
+  const [staleDemo, setStaleDemo] = useState(null);
   const [iterations, setIterations] = useState(12);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -278,6 +258,7 @@ function App() {
     await handleAction(async () => {
       const payload = await apiFetch('/cache/clear', { method: 'POST' });
       setCache(payload.data);
+      setStaleDemo((current) => (current ? { ...current, repaired: true } : current));
     });
   }
 
@@ -287,6 +268,7 @@ function App() {
       setMetrics(payload.data);
       setCache(payload.data.cache);
       setBenchmark(null);
+      setStaleDemo(null);
       setLastRequest(null);
     });
   }
@@ -302,6 +284,20 @@ function App() {
     });
   }
 
+  async function runStaleDemo() {
+    const target = selectedStudent?.id ?? students[0]?.id;
+
+    await handleAction(async () => {
+      const payload = await apiFetch('/cache/stale-demo', {
+        method: 'POST',
+        body: target ? { studentId: target } : {}
+      });
+      setStaleDemo(payload.data);
+      await loadMetrics();
+      setCache((current) => ({ ...current, enabled: true }));
+    });
+  }
+
   const responseWithCache = benchmark?.withCache?.avgMs ?? metrics?.responses?.cacheOn?.avgMs ?? 0;
   const responseWithoutCache = benchmark?.withoutCache?.avgMs ?? metrics?.responses?.cacheOff?.avgMs ?? 0;
   const liveImprovement = responseWithoutCache
@@ -309,12 +305,7 @@ function App() {
     : benchmark?.improvementPercent ?? 0;
   const visibleEvents = (metrics?.events ?? []).filter((event) => !hiddenEventTypes.has(event.type));
   const totalBenchmarkRequests = (benchmark?.withoutCache?.requests ?? 0) + (benchmark?.withCache?.requests ?? 0);
-  const estimatedDbReadsAvoided = metrics?.cacheHits ?? 0;
-  const cacheBackendLabel = cache.backend === 'redis' ? 'Redis' : 'Memória';
-  const databaseBackendLabel = metrics?.database?.backend === 'postgres' ? 'Postgres' : 'JSON local';
-  const benchmarkReadiness = benchmark
-    ? `${formatInteger(totalBenchmarkRequests)} leituras medidas`
-    : 'Execute o benchmark';
+  const staleStatus = staleDemo?.repaired ? 'Cache limpo' : staleDemo?.stale ? 'Stale detectado' : 'Aguardando teste';
 
   return (
     <div className="app-shell">
@@ -345,77 +336,6 @@ function App() {
         <MetricTile icon={Database} label="Consultas ao banco" value={metrics?.dbReads ?? 0} tone="neutral" />
       </section>
 
-      <section className="surface metrics-explanation">
-        <div className="section-heading compact">
-          <div>
-            <span className="eyebrow">Resumo das metricas</span>
-            <h2>Como ler os numeros principais</h2>
-          </div>
-        </div>
-        <ModuleNote
-          measure="Os cards acumulam respostas reais da API; depois do benchmark, as medias com e sem cache usam as fases controladas do teste."
-          meaning="Mostra latencia, hit rate, misses, leituras no banco e quanto o cache reduziu o tempo medio das consultas."
-        />
-      </section>
-
-      <section className="presentation-grid">
-        <section className="surface architecture-panel">
-          <div className="section-heading compact">
-            <div>
-              <span className="eyebrow">Arquitetura</span>
-              <h2>Cache Aside em execução</h2>
-            </div>
-            <span className="source-pill">{benchmarkReadiness}</span>
-          </div>
-          <ModuleNote
-            measure="Cada GET passa por uma chave de cache; hits, misses e leituras no banco sao registrados pela API."
-            meaning="Mostra o fluxo do padrao: consultar cache, buscar no banco no miss, preencher cache e responder rapido no hit."
-          />
-
-          <div className="status-grid">
-            <StatusPill label="Cache ativo" value={cache.enabled ? 'Sim' : 'Não'} />
-            <StatusPill label="Backend do cache" value={cacheBackendLabel} />
-            <StatusPill label="Banco principal" value={databaseBackendLabel} />
-            <StatusPill label="Leituras evitadas" value={formatInteger(estimatedDbReadsAvoided)} />
-          </div>
-
-          <div className="flow-grid">
-            <FlowStep number="1" title="API consulta o cache" detail="GET /students ou /students/:id monta a chave da leitura." />
-            <FlowStep number="2" title="Cache miss" detail="Se a chave não existe, a API busca no banco." tone="miss" />
-            <FlowStep number="3" title="Preenche o cache" detail="O resultado vai para o cache com TTL configurado." tone="fill" />
-            <FlowStep number="4" title="Cache hit" detail="As próximas leituras retornam do cache e poupam o banco." tone="hit" />
-          </div>
-        </section>
-
-        <section className="surface interpretation-panel">
-          <div className="section-heading compact">
-            <div>
-              <span className="eyebrow">Leitura dos dados</span>
-              <h2>O que mostrar para a turma</h2>
-            </div>
-          </div>
-          <ModuleNote
-            measure="Este modulo resume os sinais da execucao: origem da resposta, repeticao de leitura e invalidacao apos escrita."
-            meaning="Ajuda a explicar o trade-off: o cache melhora performance, mas exige controle de consistencia e observabilidade."
-          />
-
-          <div className="talking-points">
-            <div>
-              <strong>Sem cache</strong>
-              <span>Cada consulta repetida acessa o banco, aumentando latência e carga.</span>
-            </div>
-            <div>
-              <strong>Com cache</strong>
-              <span>A primeira leitura gera miss; as próximas viram hit e retornam muito mais rápido.</span>
-            </div>
-            <div>
-              <strong>Consistência</strong>
-              <span>POST, PUT, PATCH e DELETE invalidam as chaves afetadas para evitar dado antigo.</span>
-            </div>
-          </div>
-        </section>
-      </section>
-
       <main className="workspace">
         <section className="surface benchmark-panel">
           <div className="section-heading">
@@ -440,9 +360,9 @@ function App() {
               </button>
             </div>
           </div>
-          <ModuleNote
-            measure="O endpoint /api/benchmark executa duas fases: cache desligado e cache ligado, repetindo as mesmas leituras de aluno e lista."
-            meaning="As barras exibem tempo medio por requisicao. O ganho medio e a diferenca entre as duas fases."
+          <FocusNote
+            measure="Roda as mesmas leituras duas vezes: primeiro com cache desligado, depois com cache ligado."
+            result="Compare as barras. A diferenca e o ganho de latencia do Cache Aside."
           />
 
           <div className="comparison-bars">
@@ -470,11 +390,11 @@ function App() {
 
           <div className="benchmark-summary">
             <div>
-              <span>Requisições</span>
-              <strong>{(benchmark?.withoutCache?.requests ?? 0) + (benchmark?.withCache?.requests ?? 0)}</strong>
+              <span>Leituras medidas</span>
+              <strong>{totalBenchmarkRequests}</strong>
             </div>
             <div>
-              <span>Ganho médio</span>
+              <span>Ganho medio</span>
               <strong>{formatMs(benchmark?.improvementMs)}</strong>
             </div>
             <div>
@@ -482,6 +402,53 @@ function App() {
               <strong>{formatPercent(benchmark?.improvementPercent)}</strong>
             </div>
           </div>
+        </section>
+
+        <section className="surface consistency-panel">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">Trade-off</span>
+              <h2>Inconsistencia do cache</h2>
+            </div>
+            <button className="primary-button" onClick={runStaleDemo} disabled={loading || !students.length} title="Simular cache inconsistente">
+              <AlertTriangle size={18} />
+              Simular
+            </button>
+          </div>
+
+          <FocusNote
+            measure="Cacheia um aluno, altera o banco direto sem invalidar e consulta a mesma chave novamente."
+            result="Se cache e banco mostrarem CR diferente, existe dado stale ate expirar o TTL ou limpar o cache."
+          />
+
+          <div className={`stale-banner ${staleDemo?.stale && !staleDemo?.repaired ? 'is-stale' : ''}`}>
+            <strong>{staleStatus}</strong>
+            <span>{staleDemo?.cacheKey ?? 'Clique em simular para criar uma inconsistencia controlada.'}</span>
+          </div>
+
+          <div className="consistency-values">
+            <ConsistencyValue
+              label="Cache respondeu"
+              value={staleDemo ? `CR ${Number(staleDemo.cacheRead.gradeAverage).toFixed(1)}` : '-'}
+              tone={staleDemo?.stale && !staleDemo?.repaired ? 'stale' : 'neutral'}
+            />
+            <ConsistencyValue
+              label="Banco esta"
+              value={staleDemo ? `CR ${Number(staleDemo.databaseRead.gradeAverage).toFixed(1)}` : '-'}
+              tone="fresh"
+            />
+          </div>
+
+          <div className="consistency-flow">
+            <span>1. Leitura preenche o cache</span>
+            <span>2. Banco muda sem invalidar</span>
+            <span>3. Cache pode devolver dado antigo</span>
+          </div>
+
+          <button className="repair-button" onClick={clearCurrentCache} disabled={loading || !staleDemo} title="Limpar cache e corrigir a inconsistencia">
+            <Trash2 size={18} />
+            Corrigir limpando cache
+          </button>
         </section>
 
         <section className="surface controls-panel">
@@ -495,11 +462,6 @@ function App() {
               {lastRequest?.elapsedMs ? ` · ${formatMs(lastRequest.elapsedMs)}` : ''}
             </span>
           </div>
-
-          <ModuleNote
-            measure="Cada botao dispara uma chamada real na API. O selo no canto mostra a origem da ultima resposta e o tempo da requisicao."
-            meaning="Demonstra miss na primeira leitura, hit nas repetidas, limpeza manual e diferenca quando o cache esta desligado."
-          />
 
           <div className="command-grid">
             <button onClick={loadStudents} disabled={loading} title="Listar alunos">
@@ -555,11 +517,6 @@ function App() {
               <h2>{editingId ? 'Editar aluno' : 'Cadastrar aluno'}</h2>
             </div>
           </div>
-          <ModuleNote
-            measure="POST, PUT, PATCH e DELETE gravam no banco e invalidam as chaves de lista e aluno individual."
-            meaning="Mostra a consistencia do Cache Aside: depois de mudar dados, a proxima leitura nao pode usar cache antigo."
-          />
-
           <form onSubmit={saveStudent} className="student-form">
             <label>
               Nome
@@ -618,11 +575,6 @@ function App() {
             </div>
             <span>{students.length} registros</span>
           </div>
-          <ModuleNote
-            measure="A tabela vem de GET /api/students. A primeira listagem tende a gerar miss; as proximas tendem a vir do cache."
-            meaning="Mostra a entidade real do dominio e a consulta repetida que mais se beneficia do Cache Aside."
-          />
-
           <div className="table-wrap">
             <table>
               <thead>
@@ -671,11 +623,6 @@ function App() {
               <h2>Eventos</h2>
             </div>
           </div>
-          <ModuleNote
-            measure="A API registra eventos de cache hit, cache miss, consulta ao banco, escrita, invalidacao e benchmark."
-            meaning="Funciona como uma linha do tempo para provar o comportamento do padrao durante a apresentacao."
-          />
-
           <ol className="event-list">
             {visibleEvents.map((event) => (
               <li key={event.id}>
@@ -696,10 +643,6 @@ function App() {
               <h2>Onde as metricas nascem</h2>
             </div>
           </div>
-          <ModuleNote
-            measure="Os trechos abaixo sao os pontos onde a API mede hit/miss e onde remove cache apos escrita."
-            meaning="Conecta os numeros do dashboard com as decisoes de arquitetura implementadas no backend."
-          />
           <div className="code-grid">
             <CodeBlock title="Leitura com cache">
               {cacheAsideSnippet}

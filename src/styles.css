@@ -338,6 +338,27 @@ h2 {
   line-height: 1.45;
 }
 
+.focus-note {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffafa;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.focus-note p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+  font-size: 0.9rem;
+}
+
+.focus-note strong {
+  color: var(--redis-dark);
+}
+
 .status-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -537,6 +558,104 @@ h2 {
   display: block;
   margin-top: 5px;
   font-size: 1.2rem;
+}
+
+.consistency-panel .primary-button {
+  min-width: 126px;
+}
+
+.stale-banner {
+  min-height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 13px;
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.stale-banner.is-stale {
+  border-color: #e23b32;
+  background: #ffe1dc;
+}
+
+.stale-banner strong,
+.stale-banner span {
+  display: block;
+}
+
+.stale-banner strong {
+  color: var(--redis-dark);
+}
+
+.stale-banner span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.consistency-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.consistency-value {
+  min-height: 78px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 13px;
+}
+
+.consistency-value span,
+.consistency-value strong {
+  display: block;
+}
+
+.consistency-value span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.consistency-value strong {
+  margin-top: 6px;
+  font-size: 1.35rem;
+}
+
+.consistency-value.tone-stale {
+  border-color: #e23b32;
+  background: #fff0ee;
+}
+
+.consistency-value.tone-fresh {
+  border-color: #f0c6bf;
+}
+
+.consistency-flow {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.consistency-flow span {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffafa;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 0.88rem;
+}
+
+.repair-button {
+  width: 100%;
+  color: var(--redis-dark);
+  border-color: #f0c6bf;
+  background: #fffafa;
 }
 
 .controls-panel,
@@ -805,6 +924,7 @@ td span {
 
   .metrics-grid,
   .module-note,
+  .consistency-values,
   .status-grid,
   .flow-grid,
   .benchmark-summary,

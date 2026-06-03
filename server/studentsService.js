@@ -3,11 +3,13 @@ import {
   findAllStudents,
   findStudentById,
   patchStudent as updatePartialStudent,
+  peekFirstStudentId,
   removeStudent as deleteStudent,
   replaceStudent as updateStudent
 } from './database.js';
-import { invalidateKeys, readThroughCache } from './cache.js';
-import { badRequest } from './errors.js';
+import { invalidateKeys, isCacheEnabled, readThroughCache, setCacheEnabled } from './cache.js';
+import { addEvent } from './metrics.js';
+import { badRequest, notFound } from './errors.js';
 
 const LIST_KEY = 'students:list';
 
@@ -109,4 +111,53 @@ export async function removeStudent(rawId) {
   const removed = await deleteStudent(id);
   await invalidateStudentCache(id, 'aluno removido');
   return removed;
+}
+
+export async function simulateCacheInconsistency(rawId) {
+  const id = rawId ? parseId(rawId) : await peekFirstStudentId();
+  if (!id) throw notFound('Nenhum aluno disponivel para demonstrar inconsistencia.');
+
+  if (!isCacheEnabled()) {
+    setCacheEnabled(true);
+  }
+
+  await invalidateKeys([studentKey(id)], 'preparar demonstracao de inconsistencia');
+
+  const primedRead = await getStudent(id);
+  const oldGrade = Number(primedRead.data.gradeAverage);
+  const nextGrade = Number((oldGrade >= 9.8 ? oldGrade - 0.4 : oldGrade + 0.4).toFixed(1));
+
+  const databaseWrite = await updatePartialStudent(id, { gradeAverage: nextGrade });
+  const cacheRead = await getStudent(id);
+  const databaseRead = await findStudentById(id);
+  const stale = Number(cacheRead.data.gradeAverage) !== Number(databaseRead.gradeAverage);
+
+  addEvent(
+    'cache-stale',
+    stale
+      ? `Inconsistencia vista: cache CR ${cacheRead.data.gradeAverage}, banco CR ${databaseRead.gradeAverage}`
+      : 'Cache e banco estao consistentes'
+  );
+
+  return {
+    studentId: id,
+    cacheKey: studentKey(id),
+    stale,
+    primedRead: {
+      source: primedRead.source,
+      gradeAverage: oldGrade
+    },
+    databaseWrite: {
+      gradeAverage: databaseWrite.gradeAverage
+    },
+    cacheRead: {
+      source: cacheRead.source,
+      gradeAverage: cacheRead.data.gradeAverage
+    },
+    databaseRead: {
+      source: 'database',
+      gradeAverage: databaseRead.gradeAverage
+    },
+    explanation: 'Uma escrita externa alterou o banco sem invalidar o cache. Enquanto a chave nao expira ou nao e limpa, a API pode devolver dado antigo.'
+  };
 }
