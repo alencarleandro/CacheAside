@@ -1,7 +1,7 @@
 <div align="center">
 
 <p>
-  <img src="./docs/redis-cache-aside.svg" width="150" alt="Redis Cache Aside" />
+  <img src="./docs/redis-cache-aside.svg" width="86" alt="Redis Cache Aside" />
 </p>
 
 # Cache Aside

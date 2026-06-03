@@ -1,52 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="360" height="220" viewBox="0 0 360 220" role="img" aria-labelledby="title desc">
-  <title id="title">Redis Cache Aside</title>
-  <desc id="desc">Stylized Redis cache layers with a database and API flow.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Cache Aside Redis</title>
+  <desc id="desc">Minimal red cache layers inspired by Redis.</desc>
   <defs>
-    <linearGradient id="card" x1="38" x2="316" y1="18" y2="202" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF6B5D"/>
-      <stop offset="0.48" stop-color="#E82F25"/>
-      <stop offset="1" stop-color="#A71312"/>
+    <linearGradient id="top" x1="32" x2="96" y1="17" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9B91"/>
+      <stop offset="1" stop-color="#FF5148"/>
     </linearGradient>
-    <linearGradient id="layerTop" x1="88" x2="239" y1="61" y2="128" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF9B8F"/>
-      <stop offset="1" stop-color="#E22A22"/>
+    <linearGradient id="mid" x1="28" x2="100" y1="47" y2="79" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EF3B32"/>
+      <stop offset="1" stop-color="#C81E1E"/>
     </linearGradient>
-    <filter id="shadow" x="10" y="4" width="340" height="220" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#5E0D0B" flood-opacity="0.32"/>
+    <linearGradient id="front" x1="28" x2="100" y1="72" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4A3D"/>
+      <stop offset="1" stop-color="#E12720"/>
+    </linearGradient>
+    <filter id="softShadow" x="12" y="14" width="104" height="104" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="9" stdDeviation="8" flood-color="#7F1513" flood-opacity="0.18"/>
     </filter>
   </defs>
 
-  <rect width="360" height="220" rx="34" fill="#211715"/>
-  <rect x="22" y="18" width="316" height="184" rx="30" fill="url(#card)" filter="url(#shadow)"/>
-  <path d="M54 66C80 35 133 25 174 37C213 49 235 25 277 41C314 55 323 100 304 132C286 164 304 188 266 196C227 204 202 179 168 191C123 206 71 184 57 145C45 112 28 97 54 66Z" fill="#FFF4F1" opacity="0.12"/>
+  <rect width="128" height="128" rx="28" fill="#FFF3F1"/>
 
-  <g transform="translate(68 50)">
-    <path d="M92 12L172 45L92 80L12 45L92 12Z" fill="url(#layerTop)"/>
-    <path d="M12 45L92 80V106L12 72V45Z" fill="#B91C1C"/>
-    <path d="M172 45L92 80V106L172 72V45Z" fill="#7F1513"/>
-    <path d="M92 91L172 124L92 160L12 124L92 91Z" fill="#F43F31"/>
-    <path d="M12 124L92 160V180L12 145V124Z" fill="#A71312"/>
-    <path d="M172 124L92 160V180L172 145V124Z" fill="#6B100E"/>
-    <path d="M92 62L151 86L92 112L33 86L92 62Z" fill="#FF776D"/>
-    <path d="M33 86L92 112V133L33 108V86Z" fill="#C21F1A"/>
-    <path d="M151 86L92 112V133L151 108V86Z" fill="#881412"/>
+  <g filter="url(#softShadow)">
+    <path d="M64 18L104 38L64 58L24 38L64 18Z" fill="url(#top)"/>
+    <path d="M24 38L64 58V72L24 52V38Z" fill="#E0312A"/>
+    <path d="M104 38L64 58V72L104 52V38Z" fill="#B91C1C"/>
 
-    <rect x="62" y="40" width="28" height="20" rx="4" fill="#FFF4F1"/>
-    <rect x="96" y="34" width="22" height="16" rx="4" fill="#FFF4F1" opacity="0.88"/>
-    <circle cx="126" cy="57" r="9" fill="#FFF4F1" opacity="0.9"/>
-    <path d="M70 49H84M101 42H113M122 57H130" stroke="#E82F25" stroke-width="4" stroke-linecap="round"/>
+    <path d="M64 46L104 66L64 86L24 66L64 46Z" fill="url(#mid)"/>
+    <path d="M24 66L64 86V100L24 80V66Z" fill="#C91F1B"/>
+    <path d="M104 66L64 86V100L104 80V66Z" fill="#991B1B"/>
+
+    <path d="M64 72L104 92L64 112L24 92L64 72Z" fill="url(#front)"/>
+    <path d="M24 92L64 112V114L24 94V92Z" fill="#B91C1C"/>
+    <path d="M104 92L64 112V114L104 94V92Z" fill="#8F1715"/>
   </g>
 
-  <g transform="translate(218 61)">
-    <rect x="0" y="0" width="82" height="82" rx="22" fill="#FFF4F1" opacity="0.96"/>
-    <path d="M24 30C24 23.9 57 23.9 57 30V52C57 58.1 24 58.1 24 52V30Z" fill="#211715" opacity="0.9"/>
-    <path d="M24 30C24 36.1 57 36.1 57 30M24 41C24 47.1 57 47.1 57 41M24 52C24 58.1 57 58.1 57 52" stroke="#FFF4F1" stroke-width="3"/>
-  </g>
-
-  <path d="M203 101C218 92 232 91 247 97" stroke="#FFF4F1" stroke-width="8" stroke-linecap="round"/>
-  <path d="M239 86L257 99L236 108" fill="none" stroke="#FFF4F1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-
-  <text x="180" y="188" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800" fill="#FFF4F1" letter-spacing="1">
-    CACHE ASIDE
-  </text>
+  <path d="M48 38L64 30L80 38L64 46L48 38Z" fill="#FFF4F1" opacity="0.78"/>
+  <path d="M48 66L64 58L80 66L64 74L48 66Z" fill="#FFF4F1" opacity="0.22"/>
 </svg>
