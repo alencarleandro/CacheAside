@@ -60,8 +60,8 @@ export async function runBenchmark(iterations = 12) {
   setCacheEnabled(previousCacheState);
 
   const improvementMs = withoutCache.avgMs - withCache.avgMs;
-  const improvementPercent = withCache.avgMs
-    ? round((improvementMs / withCache.avgMs) * 100)
+  const speedupFactor = withCache.avgMs
+    ? round(withoutCache.avgMs / withCache.avgMs)
     : 0;
 
   const result = {
@@ -70,10 +70,10 @@ export async function runBenchmark(iterations = 12) {
     withoutCache,
     withCache,
     improvementMs: round(improvementMs),
-    improvementPercent
+    speedupFactor
   };
 
-  addEvent('benchmark', `Benchmark concluido: ${improvementPercent}% de melhoria media`, result);
+  addEvent('benchmark', `Benchmark concluido: cache ${speedupFactor}x mais rapido`, result);
 
   return result;
 }

@@ -46,8 +46,8 @@ function formatMs(value) {
   return `${Number(value || 0).toFixed(1)} ms`;
 }
 
-function formatPercent(value) {
-  return `${Number(value || 0).toFixed(1)}%`;
+function formatSpeedup(value) {
+  return `${Number(value || 0).toFixed(1)}x`;
 }
 
 function sourceLabel(meta) {
@@ -347,8 +347,8 @@ function App() {
               <strong>{formatMs(benchmark?.improvementMs)}</strong>
             </div>
             <div>
-              <span>Percentual</span>
-              <strong>{formatPercent(benchmark?.improvementPercent)}</strong>
+              <span>Vezes mais rapida</span>
+              <strong>{formatSpeedup(benchmark?.speedupFactor)}</strong>
             </div>
           </div>
         </section>
