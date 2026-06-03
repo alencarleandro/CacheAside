@@ -285,12 +285,10 @@ function App() {
   }
 
   async function runStaleDemo() {
-    const target = selectedStudent?.id ?? students[0]?.id;
-
     await handleAction(async () => {
       const payload = await apiFetch('/cache/stale-demo', {
         method: 'POST',
-        body: target ? { studentId: target } : {}
+        body: {}
       });
       setStaleDemo(payload.data);
       await loadMetrics();
