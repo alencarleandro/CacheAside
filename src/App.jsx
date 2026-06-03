@@ -4,16 +4,12 @@ import {
   AlertTriangle,
   BarChart3,
   Code2,
-  Database,
-  Gauge,
-  Layers,
   Play,
   Plus,
   RefreshCcw,
   Save,
   Search,
-  Trash2,
-  Zap
+  Trash2
 } from 'lucide-react';
 import { apiFetch } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
@@ -58,20 +54,6 @@ function sourceLabel(meta) {
   if (meta?.source === 'cache') return 'cache';
   if (meta?.source === 'database') return 'banco';
   return 'api';
-}
-
-function MetricTile({ icon: Icon, label, value, tone = 'neutral' }) {
-  return (
-    <article className={`metric-tile tone-${tone}`}>
-      <div className="metric-icon">
-        <Icon size={19} />
-      </div>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-    </article>
-  );
 }
 
 function CodeBlock({ title, children }) {
@@ -244,16 +226,6 @@ function App() {
     });
   }
 
-  async function toggleCache() {
-    await handleAction(async () => {
-      const payload = await apiFetch('/cache', {
-        method: 'PATCH',
-        body: { enabled: !cache.enabled }
-      });
-      setCache(payload.data);
-    });
-  }
-
   async function clearCurrentCache() {
     await handleAction(async () => {
       const payload = await apiFetch('/cache/clear', { method: 'POST' });
@@ -296,11 +268,6 @@ function App() {
     });
   }
 
-  const responseWithCache = benchmark?.withCache?.avgMs ?? metrics?.responses?.cacheOn?.avgMs ?? 0;
-  const responseWithoutCache = benchmark?.withoutCache?.avgMs ?? metrics?.responses?.cacheOff?.avgMs ?? 0;
-  const liveImprovement = responseWithoutCache
-    ? ((responseWithoutCache - responseWithCache) / responseWithoutCache) * 100
-    : benchmark?.improvementPercent ?? 0;
   const visibleEvents = (metrics?.events ?? []).filter((event) => !hiddenEventTypes.has(event.type));
   const totalBenchmarkRequests = (benchmark?.withoutCache?.requests ?? 0) + (benchmark?.withCache?.requests ?? 0);
   const staleStatus = staleDemo?.repaired ? 'Cache limpo' : staleDemo?.stale ? 'Inconsistencia detectada' : 'Aguardando teste';
@@ -314,25 +281,9 @@ function App() {
             <h1>Cache Aside</h1>
           </div>
         </div>
-
-        <button className={`cache-toggle ${cache.enabled ? 'is-on' : ''}`} onClick={toggleCache} disabled={loading} title="Ativar ou desativar cache">
-          <span className="toggle-track">
-            <span className="toggle-thumb" />
-          </span>
-          <span>{cache.enabled ? 'Cache ligado' : 'Cache desligado'}</span>
-        </button>
       </header>
 
       {error && <div className="alert">{error}</div>}
-
-      <section className="metrics-grid" aria-label="Metricas principais">
-        <MetricTile icon={Gauge} label="Media com cache" value={formatMs(responseWithCache)} tone="red" />
-        <MetricTile icon={Database} label="Media sem cache" value={formatMs(responseWithoutCache)} tone="dark" />
-        <MetricTile icon={Zap} label="Melhoria" value={formatPercent(liveImprovement)} tone="yellow" />
-        <MetricTile icon={Activity} label="Hit rate" value={formatPercent(metrics?.cacheHitRate)} tone="red" />
-        <MetricTile icon={Layers} label="Hits / misses" value={`${metrics?.cacheHits ?? 0} / ${metrics?.cacheMisses ?? 0}`} tone="pink" />
-        <MetricTile icon={Database} label="Consultas ao banco" value={metrics?.dbReads ?? 0} tone="neutral" />
-      </section>
 
       <main className="workspace">
         <section className="surface benchmark-panel">
