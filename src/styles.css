@@ -541,7 +541,7 @@ h2 {
 }
 
 .benchmark-hot-table .handsontable table {
-  min-width: 540px;
+  min-width: 700px;
 }
 
 .benchmark-hot-table .handsontable th {
@@ -993,6 +993,6 @@ td span {
   }
 
   .benchmark-hot-table .handsontable table {
-    min-width: 540px;
+    min-width: 640px;
   }
 }

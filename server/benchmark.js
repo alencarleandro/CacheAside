@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { clearCache, isCacheEnabled, setCacheEnabled } from './cache.js';
-import { peekFirstStudentId } from './database.js';
+import { findAllStudents } from './database.js';
 import { addEvent, resetMetrics } from './metrics.js';
 import { getStudent } from './studentsService.js';
 
@@ -17,26 +17,29 @@ async function timeCall(callback) {
   };
 }
 
-async function runPhase(iterations, studentId, phase) {
+async function runPhase(iterations, students, phase) {
   const times = [];
   const reads = [];
 
   for (let index = 0; index < iterations; index += 1) {
-    const readOne = await timeCall(() => getStudent(studentId));
-    const elapsedMs = round(readOne.elapsedMs);
-    const source = readOne.result.source;
+    for (const student of students) {
+      const readOne = await timeCall(() => getStudent(student.id));
+      const elapsedMs = round(readOne.elapsedMs);
+      const source = readOne.result.source;
 
-    times.push(readOne.elapsedMs);
-    reads.push({
-      phase,
-      readNumber: index + 1,
-      studentId,
-      elapsedMs,
-      source,
-      cacheMatch: source === 'cache' ? 'hit' : 'miss',
-      cacheBackend: readOne.result.cacheBackend,
-      cacheKey: readOne.result.cacheKey
-    });
+      times.push(readOne.elapsedMs);
+      reads.push({
+        phase,
+        readNumber: index + 1,
+        studentId: student.id,
+        studentName: student.name,
+        elapsedMs,
+        source,
+        cacheMatch: source === 'cache' ? 'hit' : 'miss',
+        cacheBackend: readOne.result.cacheBackend,
+        cacheKey: readOne.result.cacheKey
+      });
+    }
   }
 
   const total = times.reduce((sum, value) => sum + value, 0);
@@ -51,9 +54,9 @@ async function runPhase(iterations, studentId, phase) {
 
 export async function runBenchmark(iterations = 12) {
   const safeIterations = Math.max(4, Math.min(60, Number(iterations) || 12));
-  const studentId = await peekFirstStudentId();
+  const students = await findAllStudents();
 
-  if (!studentId) {
+  if (!students.length) {
     throw new Error('Nao ha alunos cadastrados para executar o benchmark.');
   }
 
@@ -63,12 +66,12 @@ export async function runBenchmark(iterations = 12) {
   await clearCache('inicio do benchmark');
 
   setCacheEnabled(false);
-  const withoutCache = await runPhase(safeIterations, studentId, 'sem cache');
+  const withoutCache = await runPhase(safeIterations, students, 'sem cache');
 
   await clearCache('troca para fase com cache');
 
   setCacheEnabled(true);
-  const withCache = await runPhase(safeIterations, studentId, 'com cache');
+  const withCache = await runPhase(safeIterations, students, 'com cache');
 
   setCacheEnabled(previousCacheState);
 
@@ -79,7 +82,8 @@ export async function runBenchmark(iterations = 12) {
 
   const result = {
     iterations: safeIterations,
-    studentId,
+    studentCount: students.length,
+    studentIds: students.map((student) => student.id),
     withoutCache,
     withCache,
     reads: [...withoutCache.reads, ...withCache.reads],

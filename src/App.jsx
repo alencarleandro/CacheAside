@@ -323,6 +323,7 @@ function App() {
   const withoutCacheReads = benchmarkReads.filter((read) => read.phase === 'sem cache');
   const withCacheReads = benchmarkReads.filter((read) => read.phase === 'com cache');
   const toReadTableData = (reads) => reads.map((read) => [
+    read.studentName ? `${read.studentId} - ${read.studentName}` : read.studentId,
     read.readNumber,
     formatMs(read.elapsedMs),
     read.source === 'cache' ? 'cache' : 'banco',
@@ -334,11 +335,12 @@ function App() {
   const withCacheTableData = toReadTableData(withCacheReads);
   const benchmarkTableData = benchmarkReads.length ? [...withoutCacheTableData, ...withCacheTableData] : eventTableData;
   const benchmarkTableHeaders = benchmarkReads.length
-    ? ['Leitura', 'Tempo', 'Origem', 'Match', 'Backend', 'Chave']
+    ? ['Aluno', 'Busca', 'Tempo', 'Origem', 'Match', 'Backend', 'Chave']
     : ['Hora', 'Tipo', 'Leitura', 'Resultado', 'Backend'];
   const benchmarkTableColumns = benchmarkReads.length
     ? [
-        { readOnly: true, width: 72, className: 'htCenter' },
+        { readOnly: true, width: 160 },
+        { readOnly: true, width: 64, className: 'htCenter' },
         { readOnly: true, width: 86 },
         { readOnly: true, width: 82 },
         { readOnly: true, width: 124 },
@@ -403,7 +405,7 @@ function App() {
             </div>
           </div>
           <FocusNote
-            measure="Roda as mesmas leituras duas vezes: primeiro com cache desligado, depois com cache ligado."
+            measure="Busca todos os alunos individualmente em cada repeticao: primeiro com cache desligado, depois com cache ligado."
             result="Compare as barras. A diferenca e o ganho de latencia do Cache Aside."
           />
 
