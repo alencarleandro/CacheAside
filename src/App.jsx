@@ -50,6 +50,14 @@ function formatSpeedup(value) {
   return `${Number(value || 0).toFixed(1)}x`;
 }
 
+function benchmarkSpeedup(benchmark) {
+  if (benchmark?.speedupFactor) return benchmark.speedupFactor;
+
+  const withoutCache = benchmark?.withoutCache?.avgMs ?? 0;
+  const withCache = benchmark?.withCache?.avgMs ?? 0;
+  return withCache ? withoutCache / withCache : 0;
+}
+
 function sourceLabel(meta) {
   if (meta?.source === 'cache') return 'cache';
   if (meta?.source === 'database') return 'banco';
@@ -270,6 +278,7 @@ function App() {
 
   const visibleEvents = (metrics?.events ?? []).filter((event) => !hiddenEventTypes.has(event.type));
   const totalBenchmarkRequests = (benchmark?.withoutCache?.requests ?? 0) + (benchmark?.withCache?.requests ?? 0);
+  const benchmarkSpeedupFactor = benchmarkSpeedup(benchmark);
   const staleStatus = staleDemo?.repaired ? 'Cache limpo' : staleDemo?.stale ? 'Inconsistencia detectada' : 'Aguardando teste';
 
   return (
@@ -348,7 +357,7 @@ function App() {
             </div>
             <div>
               <span>Vezes mais rapida</span>
-              <strong>{formatSpeedup(benchmark?.speedupFactor)}</strong>
+              <strong>{formatSpeedup(benchmarkSpeedupFactor)}</strong>
             </div>
           </div>
         </section>
