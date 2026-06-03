@@ -1,5 +1,9 @@
 <div align="center">
 
+<p>
+  <img src="./docs/redis-cache-aside.svg" width="150" alt="Redis Cache Aside" />
+</p>
+
 # Cache Aside
 
 API REST + dashboard React para demonstrar, medir e explicar o padrao arquitetural Cache Aside em uma aplicacao academica.

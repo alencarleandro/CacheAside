@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="220" viewBox="0 0 360 220" role="img" aria-labelledby="title desc">
+  <title id="title">Redis Cache Aside</title>
+  <desc id="desc">Stylized Redis cache layers with a database and API flow.</desc>
+  <defs>
+    <linearGradient id="card" x1="38" x2="316" y1="18" y2="202" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF6B5D"/>
+      <stop offset="0.48" stop-color="#E82F25"/>
+      <stop offset="1" stop-color="#A71312"/>
+    </linearGradient>
+    <linearGradient id="layerTop" x1="88" x2="239" y1="61" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9B8F"/>
+      <stop offset="1" stop-color="#E22A22"/>
+    </linearGradient>
+    <filter id="shadow" x="10" y="4" width="340" height="220" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#5E0D0B" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+
+  <rect width="360" height="220" rx="34" fill="#211715"/>
+  <rect x="22" y="18" width="316" height="184" rx="30" fill="url(#card)" filter="url(#shadow)"/>
+  <path d="M54 66C80 35 133 25 174 37C213 49 235 25 277 41C314 55 323 100 304 132C286 164 304 188 266 196C227 204 202 179 168 191C123 206 71 184 57 145C45 112 28 97 54 66Z" fill="#FFF4F1" opacity="0.12"/>
+
+  <g transform="translate(68 50)">
+    <path d="M92 12L172 45L92 80L12 45L92 12Z" fill="url(#layerTop)"/>
+    <path d="M12 45L92 80V106L12 72V45Z" fill="#B91C1C"/>
+    <path d="M172 45L92 80V106L172 72V45Z" fill="#7F1513"/>
+    <path d="M92 91L172 124L92 160L12 124L92 91Z" fill="#F43F31"/>
+    <path d="M12 124L92 160V180L12 145V124Z" fill="#A71312"/>
+    <path d="M172 124L92 160V180L172 145V124Z" fill="#6B100E"/>
+    <path d="M92 62L151 86L92 112L33 86L92 62Z" fill="#FF776D"/>
+    <path d="M33 86L92 112V133L33 108V86Z" fill="#C21F1A"/>
+    <path d="M151 86L92 112V133L151 108V86Z" fill="#881412"/>
+
+    <rect x="62" y="40" width="28" height="20" rx="4" fill="#FFF4F1"/>
+    <rect x="96" y="34" width="22" height="16" rx="4" fill="#FFF4F1" opacity="0.88"/>
+    <circle cx="126" cy="57" r="9" fill="#FFF4F1" opacity="0.9"/>
+    <path d="M70 49H84M101 42H113M122 57H130" stroke="#E82F25" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(218 61)">
+    <rect x="0" y="0" width="82" height="82" rx="22" fill="#FFF4F1" opacity="0.96"/>
+    <path d="M24 30C24 23.9 57 23.9 57 30V52C57 58.1 24 58.1 24 52V30Z" fill="#211715" opacity="0.9"/>
+    <path d="M24 30C24 36.1 57 36.1 57 30M24 41C24 47.1 57 47.1 57 41M24 52C24 58.1 57 58.1 57 52" stroke="#FFF4F1" stroke-width="3"/>
+  </g>
+
+  <path d="M203 101C218 92 232 91 247 97" stroke="#FFF4F1" stroke-width="8" stroke-linecap="round"/>
+  <path d="M239 86L257 99L236 108" fill="none" stroke="#FFF4F1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="180" y="188" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800" fill="#FFF4F1" letter-spacing="1">
+    CACHE ASIDE
+  </text>
+</svg>
