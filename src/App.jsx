@@ -334,20 +334,20 @@ function App() {
     : ['Hora', 'Tipo', 'Leitura', 'Resultado', 'Backend'];
   const benchmarkTableColumns = readTableData.length
     ? [
-        { readOnly: true, width: 110 },
-        { readOnly: true, width: 76 },
-        { readOnly: true, width: 90 },
-        { readOnly: true, width: 90 },
-        { readOnly: true, width: 130 },
-        { readOnly: true, width: 100 },
-        { readOnly: true, width: 150 }
+        { readOnly: true, width: 96 },
+        { readOnly: true, width: 72, className: 'htCenter' },
+        { readOnly: true, width: 86 },
+        { readOnly: true, width: 82 },
+        { readOnly: true, width: 124 },
+        { readOnly: true, width: 92 },
+        { readOnly: true, width: 138 }
       ]
     : [
-        { readOnly: true, width: 88 },
-        { readOnly: true, width: 88 },
-        { readOnly: true, width: 210 },
-        { readOnly: true, width: 180 },
-        { readOnly: true, width: 100 }
+        { readOnly: true, width: 86 },
+        { readOnly: true, width: 82 },
+        { readOnly: true, width: 190 },
+        { readOnly: true, width: 160 },
+        { readOnly: true, width: 92 }
       ];
   const benchmarkTableHits = readTableData.length
     ? (benchmark?.reads ?? []).filter((read) => read.cacheMatch === 'hit').length
@@ -465,11 +465,14 @@ function App() {
                   data={benchmarkTableData}
                   colHeaders={benchmarkTableHeaders}
                   columns={benchmarkTableColumns}
-                  height={Math.min(360, Math.max(180, benchmarkTableData.length * 32 + 44))}
+                  width="100%"
+                  height={Math.min(340, Math.max(190, benchmarkTableData.length * 30 + 42))}
                   stretchH="all"
-                  rowHeaders
+                  rowHeaders={false}
                   readOnly
-                  manualColumnResize
+                  autoColumnSize={false}
+                  viewportColumnRenderingOffset={benchmarkTableHeaders.length}
+                  rowHeights={30}
                   licenseKey="non-commercial-and-evaluation"
                 />
               </div>

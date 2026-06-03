@@ -502,22 +502,53 @@ h2 {
 }
 
 .benchmark-hot-table {
+  width: 100%;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
+  background: #fbfcfa;
 }
 
 .benchmark-hot-table .handsontable {
+  width: 100% !important;
   color: var(--ink);
   font-size: 0.82rem;
+}
+
+.benchmark-hot-table .handsontable .wtHolder {
+  width: 100% !important;
+}
+
+.benchmark-hot-table .handsontable table {
+  min-width: 620px;
 }
 
 .benchmark-hot-table .handsontable th {
   background: #fffafa;
   color: var(--redis-dark);
   font-weight: 800;
+}
+
+.benchmark-hot-table .handsontable td,
+.benchmark-hot-table .handsontable th {
+  height: 30px;
+  line-height: 1.25;
+  padding: 0 8px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.benchmark-hot-table .handsontable td {
+  color: var(--ink);
+}
+
+.benchmark-hot-table .ht_clone_top,
+.benchmark-hot-table .ht_clone_inline_start,
+.benchmark-hot-table .ht_clone_top_inline_start_corner {
+  z-index: 1;
 }
 
 .consistency-panel .primary-button {
@@ -930,5 +961,9 @@ td span {
 
   .bar-row strong {
     text-align: left;
+  }
+
+  .benchmark-hot-table .handsontable table {
+    min-width: 540px;
   }
 }
