@@ -199,6 +199,10 @@ h2 {
   margin: 22px 0;
 }
 
+.metrics-explanation {
+  margin-bottom: 16px;
+}
+
 .metric-tile {
   min-height: 104px;
   border: 1px solid var(--line);
@@ -274,6 +278,13 @@ h2 {
   min-width: 0;
 }
 
+.presentation-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
 .surface {
   min-width: 0;
   max-width: 100%;
@@ -295,6 +306,139 @@ h2 {
 
 .section-heading.compact {
   margin-bottom: 14px;
+}
+
+.module-note {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.module-note div {
+  min-height: 78px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffafa;
+  padding: 12px;
+}
+
+.module-note strong {
+  display: block;
+  color: var(--redis-dark);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.module-note span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.status-pill {
+  min-height: 70px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 12px;
+}
+
+.status-pill span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.status-pill strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 1.05rem;
+}
+
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.flow-step {
+  min-height: 118px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 13px;
+}
+
+.flow-step > span {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--redis);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 0.82rem;
+}
+
+.flow-step strong,
+.flow-step small {
+  display: block;
+}
+
+.flow-step strong {
+  margin-top: 11px;
+}
+
+.flow-step small {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.flow-step.tone-miss > span {
+  background: var(--coral);
+}
+
+.flow-step.tone-fill > span {
+  background: var(--amber);
+}
+
+.flow-step.tone-hit > span {
+  background: var(--redis-dark);
+}
+
+.talking-points {
+  display: grid;
+  gap: 10px;
+}
+
+.talking-points div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 13px;
+}
+
+.talking-points strong,
+.talking-points span {
+  display: block;
+}
+
+.talking-points span {
+  margin-top: 5px;
+  color: var(--muted);
+  line-height: 1.42;
 }
 
 .inline-controls {
@@ -523,6 +667,47 @@ td span {
   grid-column: 1 / -1;
 }
 
+.code-panel {
+  grid-column: 1 / -1;
+}
+
+.code-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.code-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #2b211f;
+  overflow: hidden;
+}
+
+.code-card > div {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  background: #3a2b28;
+  color: #ffffff;
+}
+
+.code-card pre {
+  margin: 0;
+  padding: 14px;
+  overflow-x: auto;
+}
+
+.code-card code {
+  color: #ffe1dc;
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
 .event-list {
   list-style: none;
   margin: 0;
@@ -583,8 +768,15 @@ td span {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .presentation-grid,
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .status-grid,
+  .flow-grid,
+  .code-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -612,11 +804,15 @@ td span {
   }
 
   .metrics-grid,
+  .module-note,
+  .status-grid,
+  .flow-grid,
   .benchmark-summary,
   .cache-state,
   .command-grid,
   .form-pair,
   .form-actions,
+  .code-grid,
   .event-list {
     grid-template-columns: 1fr;
   }

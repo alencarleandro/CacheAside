@@ -137,6 +137,7 @@ app.post('/api/cache/clear', asyncRoute(async () => ({
 app.get('/api/metrics', asyncRoute(async () => ({
   data: {
     ...getMetrics(),
+    database: getDatabaseState(),
     cache: await getCacheState()
   }
 })));
@@ -146,6 +147,7 @@ app.post('/api/metrics/reset', asyncRoute(async () => {
   return {
     data: {
       ...getMetrics(),
+      database: getDatabaseState(),
       cache: await getCacheState()
     }
   };
