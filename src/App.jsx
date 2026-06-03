@@ -303,7 +303,7 @@ function App() {
     : benchmark?.improvementPercent ?? 0;
   const visibleEvents = (metrics?.events ?? []).filter((event) => !hiddenEventTypes.has(event.type));
   const totalBenchmarkRequests = (benchmark?.withoutCache?.requests ?? 0) + (benchmark?.withCache?.requests ?? 0);
-  const staleStatus = staleDemo?.repaired ? 'Cache limpo' : staleDemo?.stale ? 'Stale detectado' : 'Aguardando teste';
+  const staleStatus = staleDemo?.repaired ? 'Cache limpo' : staleDemo?.stale ? 'Inconsistencia detectada' : 'Aguardando teste';
 
   return (
     <div className="app-shell">
@@ -426,7 +426,7 @@ function App() {
             </div>
             <div>
               <strong>Custo</strong>
-              <span>risco de dado stale ate invalidar, limpar ou expirar o TTL</span>
+              <span>risco de dado antigo ate invalidar, limpar ou expirar o TTL</span>
             </div>
           </div>
 
