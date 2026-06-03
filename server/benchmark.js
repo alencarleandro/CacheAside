@@ -42,6 +42,16 @@ async function runPhase(iterations, students, phase) {
     }
   }
 
+  if (!times.length) {
+    return {
+      requests: 0,
+      avgMs: 0,
+      minMs: 0,
+      maxMs: 0,
+      reads
+    };
+  }
+
   const total = times.reduce((sum, value) => sum + value, 0);
   return {
     requests: times.length,
@@ -53,7 +63,11 @@ async function runPhase(iterations, students, phase) {
 }
 
 export async function runBenchmark(iterations = 12) {
-  const safeIterations = Math.max(4, Math.min(60, Number(iterations) || 12));
+  const parsedIterations = Number(iterations);
+  const safeIterations = Number.isFinite(parsedIterations)
+    ? Math.max(0, Math.min(60, parsedIterations))
+    : 12;
+  const measuredIterations = safeIterations + 1;
   const students = await findAllStudents();
 
   if (!students.length) {
@@ -66,12 +80,12 @@ export async function runBenchmark(iterations = 12) {
   await clearCache('inicio do benchmark');
 
   setCacheEnabled(false);
-  const withoutCache = await runPhase(safeIterations, students, 'sem cache');
+  const withoutCache = await runPhase(measuredIterations, students, 'sem cache');
 
   await clearCache('troca para fase com cache');
 
   setCacheEnabled(true);
-  const withCache = await runPhase(safeIterations, students, 'com cache');
+  const withCache = await runPhase(measuredIterations, students, 'com cache');
 
   setCacheEnabled(previousCacheState);
 
@@ -82,6 +96,7 @@ export async function runBenchmark(iterations = 12) {
 
   const result = {
     iterations: safeIterations,
+    measuredIterations,
     studentCount: students.length,
     studentIds: students.map((student) => student.id),
     withoutCache,

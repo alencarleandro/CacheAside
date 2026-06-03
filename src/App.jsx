@@ -5,7 +5,6 @@ import {
   BarChart3,
   ChevronDown,
   ChevronUp,
-  Code2,
   Play,
   Plus,
   RefreshCcw,
@@ -29,26 +28,6 @@ const emptyForm = {
   period: 5,
   gradeAverage: 8
 };
-
-const hiddenEventTypes = new Set(['redis', 'redis-error', 'database', 'database-error']);
-
-const cacheAsideSnippet = `const cached = await client.get(cacheKey);
-if (cached) {
-  recordCacheHit(label);
-  return JSON.parse(cached);
-}
-
-recordCacheMiss(label);
-const data = await loader();
-await client.set(cacheKey, JSON.stringify(data), { EX: ttl });`;
-
-const invalidationSnippet = `await client.del([
-  "students:list",
-  \`students:\${id}\`
-]);
-
-// Toda escrita invalida o cache relacionado
-// para evitar leitura de dado antigo.`;
 
 function formatMs(value) {
   return `${Number(value || 0).toFixed(1)} ms`;
@@ -96,20 +75,6 @@ function sourceLabel(meta) {
   return 'api';
 }
 
-function CodeBlock({ title, children }) {
-  return (
-    <article className="code-card">
-      <div>
-        <Code2 size={18} />
-        <strong>{title}</strong>
-      </div>
-      <pre>
-        <code>{children}</code>
-      </pre>
-    </article>
-  );
-}
-
 function FocusNote({ measure, result }) {
   return (
     <div className="focus-note">
@@ -138,6 +103,8 @@ function App() {
   const [lastRequest, setLastRequest] = useState(null);
   const [benchmark, setBenchmark] = useState(null);
   const [benchmarkExpanded, setBenchmarkExpanded] = useState(false);
+  const [withoutCacheExpanded, setWithoutCacheExpanded] = useState(true);
+  const [withCacheExpanded, setWithCacheExpanded] = useState(true);
   const [staleDemo, setStaleDemo] = useState(null);
   const [iterations, setIterations] = useState(12);
   const [loading, setLoading] = useState(false);
@@ -309,7 +276,6 @@ function App() {
     });
   }
 
-  const visibleEvents = (metrics?.events ?? []).filter((event) => !hiddenEventTypes.has(event.type));
   const eventTableData = (metrics?.events ?? [])
     .filter((event) => ['cache-hit', 'cache-miss', 'database-read'].includes(event.type))
     .map((event) => [
@@ -325,27 +291,19 @@ function App() {
   const toReadTableData = (reads) => reads.map((read) => [
     read.studentName ? `${read.studentId} - ${read.studentName}` : read.studentId,
     read.readNumber,
-    formatMs(read.elapsedMs),
-    read.source === 'cache' ? 'cache' : 'banco',
-    benchmarkReadResult(read),
-    read.cacheBackend ?? '-',
-    read.cacheKey ?? '-'
+    formatMs(read.elapsedMs)
   ]);
   const withoutCacheTableData = toReadTableData(withoutCacheReads);
   const withCacheTableData = toReadTableData(withCacheReads);
   const benchmarkTableData = benchmarkReads.length ? [...withoutCacheTableData, ...withCacheTableData] : eventTableData;
   const benchmarkTableHeaders = benchmarkReads.length
-    ? ['Aluno', 'Busca', 'Tempo', 'Origem', 'Match', 'Backend', 'Chave']
+    ? ['Aluno', 'Busca', 'Tempo']
     : ['Hora', 'Tipo', 'Leitura', 'Resultado', 'Backend'];
   const benchmarkTableColumns = benchmarkReads.length
     ? [
-        { readOnly: true, width: 160 },
+        { readOnly: true, width: 220 },
         { readOnly: true, width: 64, className: 'htCenter' },
-        { readOnly: true, width: 86 },
-        { readOnly: true, width: 82 },
-        { readOnly: true, width: 124 },
-        { readOnly: true, width: 92 },
-        { readOnly: true, width: 138 }
+        { readOnly: true, width: 96 }
       ]
     : [
         { readOnly: true, width: 86 },
@@ -384,15 +342,15 @@ function App() {
         <section className="surface benchmark-panel">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">Comparativo</span>
-              <h2>Benchmark controlado</h2>
+              <span className="eyebrow">Benchmark</span>
+              <h2>Benchmark</h2>
             </div>
             <div className="inline-controls">
               <label>
                 Repetições
                 <input
                   type="number"
-                  min="4"
+                  min="0"
                   max="60"
                   value={iterations}
                   onChange={(event) => setIterations(event.target.value)}
@@ -405,7 +363,7 @@ function App() {
             </div>
           </div>
           <FocusNote
-            measure="Busca todos os alunos individualmente em cada repeticao: primeiro com cache desligado, depois com cache ligado."
+            measure="Busca todos os alunos individualmente: 1 leitura base mais a quantidade de repeticoes, primeiro com cache desligado, depois com cache ligado."
             result="Compare as barras. A diferenca e o ganho de latencia do Cache Aside."
           />
 
@@ -447,35 +405,124 @@ function App() {
             </div>
           </div>
 
-          <button
-            className="expand-button"
-            type="button"
-            onClick={() => setBenchmarkExpanded((current) => !current)}
-            aria-expanded={benchmarkExpanded}
-            title={benchmarkExpanded ? 'Recolher detalhes' : 'Expandir detalhes'}
-          >
-            {benchmarkExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </button>
-
-          {benchmarkExpanded && (
-            <div className="benchmark-details">
+          <div className="benchmark-details">
               <div className="benchmark-table-meta">
                 <span>{benchmarkTableData.length} registros</span>
                 <span>{benchmarkTableHits} hits</span>
                 <span>{benchmarkTableMisses} misses</span>
                 <span>{benchmarkTableHitRate.toFixed(1)}% hit</span>
+                {benchmarkReads.length > 0 && (!withoutCacheExpanded || !withCacheExpanded) && (
+                  <div className="benchmark-collapsed-actions">
+                    {!withoutCacheExpanded && (
+                      <button
+                        className="table-toggle"
+                        type="button"
+                        onClick={() => setWithoutCacheExpanded(true)}
+                        aria-expanded={withoutCacheExpanded}
+                      >
+                        <strong>Sem cache</strong>
+                        <ChevronDown size={16} />
+                      </button>
+                    )}
+                    {!withCacheExpanded && (
+                      <button
+                        className="table-toggle"
+                        type="button"
+                        onClick={() => setWithCacheExpanded(true)}
+                        aria-expanded={withCacheExpanded}
+                      >
+                        <strong>Com cache</strong>
+                        <ChevronDown size={16} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                <button
+                  className="details-toggle"
+                  type="button"
+                  onClick={() => setBenchmarkExpanded((current) => !current)}
+                  aria-expanded={benchmarkExpanded}
+                  title={benchmarkExpanded ? 'Recolher detalhes' : 'Expandir detalhes'}
+                >
+                  {benchmarkExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                </button>
               </div>
-              {benchmarkReads.length ? (
-                <div className="benchmark-table-grid">
-                  <div className="benchmark-table-card">
-                    <strong>Sem cache</strong>
+              <div className={`benchmark-detail-body ${benchmarkExpanded ? 'is-open' : 'is-closed'}`}>
+                <div className="benchmark-detail-content">
+                  {benchmarkReads.length ? (
+                    <>
+                      {(withoutCacheExpanded || withCacheExpanded) && (
+                        <div className={`benchmark-table-grid ${withoutCacheExpanded && withCacheExpanded ? '' : 'has-single-table'}`}>
+                          {withoutCacheExpanded && (
+                            <div className="benchmark-table-card">
+                              <button
+                                className="table-toggle"
+                                type="button"
+                                onClick={() => setWithoutCacheExpanded(false)}
+                                aria-expanded={withoutCacheExpanded}
+                              >
+                                <strong>Sem cache</strong>
+                                <ChevronUp size={16} />
+                              </button>
+                              <div className="benchmark-hot-table">
+                                <HotTable
+                                  data={withoutCacheTableData}
+                                  colHeaders={benchmarkTableHeaders}
+                                  columns={benchmarkTableColumns}
+                                  width="100%"
+                                  height={Math.min(300, Math.max(170, withoutCacheTableData.length * 30 + 42))}
+                                  stretchH="all"
+                                  rowHeaders={false}
+                                  readOnly
+                                  autoColumnSize={false}
+                                  viewportColumnRenderingOffset={benchmarkTableHeaders.length}
+                                  rowHeights={30}
+                                  licenseKey="non-commercial-and-evaluation"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {withCacheExpanded && (
+                            <div className="benchmark-table-card">
+                              <button
+                                className="table-toggle"
+                                type="button"
+                                onClick={() => setWithCacheExpanded(false)}
+                                aria-expanded={withCacheExpanded}
+                              >
+                                <strong>Com cache</strong>
+                                <ChevronUp size={16} />
+                              </button>
+                              <div className="benchmark-hot-table">
+                                <HotTable
+                                  data={withCacheTableData}
+                                  colHeaders={benchmarkTableHeaders}
+                                  columns={benchmarkTableColumns}
+                                  width="100%"
+                                  height={Math.min(300, Math.max(170, withCacheTableData.length * 30 + 42))}
+                                  stretchH="all"
+                                  rowHeaders={false}
+                                  readOnly
+                                  autoColumnSize={false}
+                                  viewportColumnRenderingOffset={benchmarkTableHeaders.length}
+                                  rowHeights={30}
+                                  licenseKey="non-commercial-and-evaluation"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
                     <div className="benchmark-hot-table">
                       <HotTable
-                        data={withoutCacheTableData}
+                        data={benchmarkTableData}
                         colHeaders={benchmarkTableHeaders}
                         columns={benchmarkTableColumns}
                         width="100%"
-                        height={Math.min(300, Math.max(170, withoutCacheTableData.length * 30 + 42))}
+                        height={Math.min(340, Math.max(190, benchmarkTableData.length * 30 + 42))}
                         stretchH="all"
                         rowHeaders={false}
                         readOnly
@@ -485,54 +532,17 @@ function App() {
                         licenseKey="non-commercial-and-evaluation"
                       />
                     </div>
-                  </div>
-                  <div className="benchmark-table-card">
-                    <strong>Com cache</strong>
-                    <div className="benchmark-hot-table">
-                      <HotTable
-                        data={withCacheTableData}
-                        colHeaders={benchmarkTableHeaders}
-                        columns={benchmarkTableColumns}
-                        width="100%"
-                        height={Math.min(300, Math.max(170, withCacheTableData.length * 30 + 42))}
-                        stretchH="all"
-                        rowHeaders={false}
-                        readOnly
-                        autoColumnSize={false}
-                        viewportColumnRenderingOffset={benchmarkTableHeaders.length}
-                        rowHeights={30}
-                        licenseKey="non-commercial-and-evaluation"
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
-              ) : (
-                <div className="benchmark-hot-table">
-                  <HotTable
-                    data={benchmarkTableData}
-                    colHeaders={benchmarkTableHeaders}
-                    columns={benchmarkTableColumns}
-                    width="100%"
-                    height={Math.min(340, Math.max(190, benchmarkTableData.length * 30 + 42))}
-                    stretchH="all"
-                    rowHeaders={false}
-                    readOnly
-                    autoColumnSize={false}
-                    viewportColumnRenderingOffset={benchmarkTableHeaders.length}
-                    rowHeights={30}
-                    licenseKey="non-commercial-and-evaluation"
-                  />
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+          </div>
         </section>
 
         <section className="surface consistency-panel">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">Inconsistencia</span>
-              <h2>Trade-off: performance x consistencia</h2>
+              <span className="eyebrow">Tradeoff</span>
+              <h2>Tradeoff</h2>
             </div>
             <button className="primary-button" onClick={runStaleDemo} disabled={loading || !students.length} title="Simular cache inconsistente">
               <AlertTriangle size={18} />
@@ -586,11 +596,11 @@ function App() {
           </button>
         </section>
 
-        <section className="surface controls-panel">
-          <div className="section-heading compact">
+        <section className="surface crud-panel">
+          <div className="section-heading">
             <div>
-              <span className="eyebrow">Operação</span>
-              <h2>API em tempo real</h2>
+              <span className="eyebrow">CRUD</span>
+              <h2>CRUD</h2>
             </div>
             <span className={`source-pill source-${lastRequest?.source ?? 'api'} backend-${lastRequest?.cacheBackend ?? 'none'}`}>
               {sourceLabel(lastRequest)}
@@ -643,9 +653,9 @@ function App() {
               <small>{selectedStudent.course}</small>
             </div>
           )}
-        </section>
 
-        <section className="surface form-panel">
+          <div className="crud-layout">
+        <section className="form-panel">
           <div className="section-heading compact">
             <div>
               <span className="eyebrow">CRUD</span>
@@ -702,7 +712,7 @@ function App() {
           </form>
         </section>
 
-        <section className="surface students-panel">
+        <section className="students-panel">
           <div className="section-heading compact">
             <div>
               <span className="eyebrow">Dados</span>
@@ -751,45 +761,13 @@ function App() {
           </div>
         </section>
 
-        <section className="surface events-panel">
-          <div className="section-heading compact">
-            <div>
-              <span className="eyebrow">Observabilidade</span>
-              <h2>Eventos</h2>
-            </div>
           </div>
-          <ol className="event-list">
-            {visibleEvents.map((event) => (
-              <li key={event.id}>
-                <span className={`event-dot event-${event.type}`} />
-                <div>
-                  <strong>{event.message}</strong>
-                  <time>{new Date(event.at).toLocaleTimeString('pt-BR')}</time>
-                </div>
-              </li>
-            ))}
-          </ol>
         </section>
 
-        <section className="surface code-panel">
-          <div className="section-heading compact">
-            <div>
-              <span className="eyebrow">Implementacao</span>
-              <h2>Onde as metricas nascem</h2>
-            </div>
-          </div>
-          <div className="code-grid">
-            <CodeBlock title="Leitura com cache">
-              {cacheAsideSnippet}
-            </CodeBlock>
-            <CodeBlock title="Invalidacao apos escrita">
-              {invalidationSnippet}
-            </CodeBlock>
-          </div>
-        </section>
       </main>
     </div>
   );
 }
 
 export default App;
+
