@@ -407,8 +407,8 @@ function App() {
         <section className="surface consistency-panel">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">Trade-off</span>
-              <h2>Inconsistencia do cache</h2>
+              <span className="eyebrow">Inconsistencia</span>
+              <h2>Trade-off: performance x consistencia</h2>
             </div>
             <button className="primary-button" onClick={runStaleDemo} disabled={loading || !students.length} title="Simular cache inconsistente">
               <AlertTriangle size={18} />
@@ -418,8 +418,19 @@ function App() {
 
           <FocusNote
             measure="Cacheia um aluno, altera o banco direto sem invalidar e consulta a mesma chave novamente."
-            result="Se cache e banco mostrarem CR diferente, existe dado stale ate expirar o TTL ou limpar o cache."
+            result="O ganho de velocidade vem com um custo: se a invalidacao falhar, o cache pode entregar dado antigo."
           />
+
+          <div className="tradeoff-summary">
+            <div>
+              <strong>Ganho</strong>
+              <span>menos latencia e menos leitura no banco</span>
+            </div>
+            <div>
+              <strong>Custo</strong>
+              <span>risco de dado stale ate invalidar, limpar ou expirar o TTL</span>
+            </div>
+          </div>
 
           <div className={`stale-banner ${staleDemo?.stale && !staleDemo?.repaired ? 'is-stale' : ''}`}>
             <strong>{staleStatus}</strong>
