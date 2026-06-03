@@ -10,9 +10,12 @@ import { runBenchmark } from './benchmark.js';
 import { getDatabaseState } from './database.js';
 import {
   createStudent,
+  editStaleDemoDatabase,
   getStudent,
   getStudents,
   patchStudent,
+  primeStaleDemo,
+  readStaleDemoAgain,
   removeStudent,
   replaceStudent,
   simulateCacheInconsistency
@@ -137,6 +140,18 @@ app.post('/api/cache/clear', asyncRoute(async () => ({
 
 app.post('/api/cache/stale-demo', asyncRoute(async (request) => ({
   data: await simulateCacheInconsistency(request.body?.studentId)
+})));
+
+app.post('/api/cache/stale-demo/prime', asyncRoute(async (request) => ({
+  data: await primeStaleDemo(request.body?.studentId)
+})));
+
+app.post('/api/cache/stale-demo/edit', asyncRoute(async (request) => ({
+  data: await editStaleDemoDatabase(request.body?.studentId, request.body)
+})));
+
+app.post('/api/cache/stale-demo/read', asyncRoute(async (request) => ({
+  data: await readStaleDemoAgain(request.body?.studentId)
 })));
 
 app.get('/api/metrics', asyncRoute(async () => ({

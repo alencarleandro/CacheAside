@@ -1,36 +1,35 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Activity,
+  ArrowRight,
   AlertTriangle,
-  BarChart3,
   ChevronDown,
   ChevronUp,
+  Database,
+  PencilLine,
   Play,
-  Plus,
   RefreshCcw,
-  Save,
-  Search,
-  Trash2
+  Send,
+  Server
 } from 'lucide-react';
-import { HotTable } from '@handsontable/react-wrapper';
-import { registerAllModules } from 'handsontable/registry';
-import 'handsontable/styles/handsontable.min.css';
-import 'handsontable/styles/ht-theme-main.min.css';
 import { apiFetch } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
 
-registerAllModules();
-
-const emptyForm = {
-  name: '',
-  email: '',
-  course: 'Engenharia de Software',
-  period: 5,
-  gradeAverage: 8
-};
+const INITIAL_BENCHMARK_REPETITIONS = 1;
 
 function formatMs(value) {
-  return `${Number(value || 0).toFixed(1)} ms`;
+  const milliseconds = Number(value || 0);
+  const absolute = Math.abs(milliseconds);
+  const units = [
+    { limit: 1_000, divisor: 1, suffix: 'ms' },
+    { limit: 60_000, divisor: 1_000, suffix: 's' },
+    { limit: 3_600_000, divisor: 60_000, suffix: 'min' },
+    { limit: 86_400_000, divisor: 3_600_000, suffix: 'h' },
+    { limit: Infinity, divisor: 86_400_000, suffix: 'd' }
+  ];
+  const unit = units.find((item) => absolute < item.limit);
+  const scaled = milliseconds / unit.divisor;
+  const decimals = unit.suffix === 'ms' || Math.abs(scaled) >= 10 ? 1 : 2;
+  return `${scaled.toFixed(decimals)} ${unit.suffix}`;
 }
 
 function formatSpeedup(value) {
@@ -45,34 +44,71 @@ function benchmarkSpeedup(benchmark) {
   return withCache ? withoutCache / withCache : 0;
 }
 
-function benchmarkEventType(type) {
-  if (type === 'cache-hit') return 'Hit';
-  if (type === 'cache-miss') return 'Miss';
-  if (type === 'database-read') return 'Banco';
-  return type;
+function benchmarkTotalMs(phase) {
+  if (phase?.totalMs !== undefined) return phase.totalMs;
+  return Number(phase?.avgMs ?? 0) * Number(phase?.requests ?? 0);
 }
 
-function benchmarkEventTarget(message) {
-  return message.split(': ').slice(1).join(': ') || message;
+function groupReadsBySearch(reads) {
+  const groups = new Map();
+
+  for (const read of reads) {
+    const readNumber = read.readNumber ?? 1;
+
+    if (!groups.has(readNumber)) {
+      groups.set(readNumber, {
+        readNumber,
+        reads: [],
+        totalMs: 0
+      });
+    }
+
+    const group = groups.get(readNumber);
+    group.reads.push(read);
+    group.totalMs += Number(read.elapsedMs || 0);
+  }
+
+  return Array.from(groups.values()).sort((current, next) => current.readNumber - next.readNumber);
 }
 
-function benchmarkEventResult(type) {
-  if (type === 'cache-hit') return 'Encontrou no cache';
-  if (type === 'cache-miss') return 'Nao encontrou no cache';
-  if (type === 'database-read') return 'Leu no banco';
-  return '-';
+function readStudentLabel(read) {
+  return read.studentName ? `${read.studentId} - ${read.studentName}` : read.studentId;
 }
 
-function benchmarkReadResult(read) {
-  if (read.cacheMatch === 'hit') return 'Hit no cache';
-  if (read.phase === 'sem cache') return 'Cache desligado';
-  return 'Miss no cache';
+function formatGrade(value) {
+  return Number(value ?? 0).toFixed(1);
 }
 
-function sourceLabel(meta) {
-  if (meta?.source === 'cache') return 'cache';
-  if (meta?.source === 'database') return 'banco';
-  return 'api';
+function nextDemoGrade(value) {
+  const grade = Number(value ?? 0);
+  return Number((grade >= 9.8 ? grade - 0.4 : grade + 0.4).toFixed(1));
+}
+
+function BenchmarkSearchCards({ groups }) {
+  return (
+    <div className="benchmark-search-list">
+      {groups.map((group) => (
+        <article className="benchmark-search-card" key={group.readNumber}>
+          <header>
+            <div>
+              <strong>Busca {group.readNumber}</strong>
+              <span>{group.reads.length} itens</span>
+            </div>
+            <b>{formatMs(group.totalMs)}</b>
+          </header>
+
+          <div className="benchmark-search-items">
+            {group.reads.map((read) => (
+              <div className="benchmark-search-item" key={`${read.phase}-${read.readNumber}-${read.studentId}`}>
+                <span>{readStudentLabel(read)}</span>
+                <strong>{formatMs(read.elapsedMs)}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
 }
 
 function FocusNote({ measure, result }) {
@@ -84,30 +120,20 @@ function FocusNote({ measure, result }) {
   );
 }
 
-function ConsistencyValue({ label, value, tone = 'neutral' }) {
-  return (
-    <div className={`consistency-value tone-${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function App() {
   const [students, setStudents] = useState([]);
   const [metrics, setMetrics] = useState(null);
   const [cache, setCache] = useState({ enabled: true, size: 0, keys: [] });
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [lastRequest, setLastRequest] = useState(null);
   const [benchmark, setBenchmark] = useState(null);
   const [benchmarkExpanded, setBenchmarkExpanded] = useState(false);
   const [withoutCacheExpanded, setWithoutCacheExpanded] = useState(true);
   const [withCacheExpanded, setWithCacheExpanded] = useState(true);
   const [staleDemo, setStaleDemo] = useState(null);
-  const [iterations, setIterations] = useState(12);
+  const [demoGradeInput, setDemoGradeInput] = useState('9.9');
+  const [iterations, setIterations] = useState(INITIAL_BENCHMARK_REPETITIONS);
   const [loading, setLoading] = useState(false);
+  const [benchmarkLoading, setBenchmarkLoading] = useState(false);
+  const [tradeoffLoading, setTradeoffLoading] = useState(false);
   const [error, setError] = useState('');
 
   const benchmarkScale = useMemo(() => {
@@ -125,7 +151,6 @@ function App() {
   async function loadStudents() {
     const payload = await apiFetch('/students');
     setStudents(payload.data);
-    setLastRequest(payload.meta);
     await loadMetrics();
   }
 
@@ -133,6 +158,7 @@ function App() {
     setError('');
     try {
       await loadStudents();
+      await executeBenchmark(INITIAL_BENCHMARK_REPETITIONS);
     } catch (err) {
       setError(err.message);
     }
@@ -141,29 +167,6 @@ function App() {
   useEffect(() => {
     refreshDashboard();
   }, []);
-
-  function updateForm(field, value) {
-    setForm((current) => ({
-      ...current,
-      [field]: value
-    }));
-  }
-
-  function startEdit(student) {
-    setEditingId(student.id);
-    setForm({
-      name: student.name,
-      email: student.email,
-      course: student.course,
-      period: student.period,
-      gradeAverage: student.gradeAverage
-    });
-  }
-
-  function resetForm() {
-    setEditingId(null);
-    setForm(emptyForm);
-  }
 
   async function handleAction(action) {
     setLoading(true);
@@ -179,151 +182,186 @@ function App() {
     }
   }
 
-  async function saveStudent(event) {
-    event.preventDefault();
-    await handleAction(async () => {
-      const path = editingId ? `/students/${editingId}` : '/students';
-      const method = editingId ? 'PUT' : 'POST';
-      await apiFetch(path, { method, body: form });
-      resetForm();
-      await loadStudents();
-    });
-  }
+  async function resetTradeoffMap() {
+    setTradeoffLoading(true);
 
-  async function deleteStudent(id) {
-    await handleAction(async () => {
-      await apiFetch(`/students/${id}`, { method: 'DELETE' });
-      if (selectedStudent?.id === id) setSelectedStudent(null);
-      await loadStudents();
-    });
-  }
-
-  async function patchGrade(student) {
-    await handleAction(async () => {
-      const nextGrade = Math.min(10, Number(student.gradeAverage) + 0.1).toFixed(1);
-      await apiFetch(`/students/${student.id}`, {
-        method: 'PATCH',
-        body: { gradeAverage: nextGrade }
+    try {
+      await handleAction(async () => {
+        const payload = await apiFetch('/cache/clear', { method: 'POST' });
+        setCache(payload.data);
+        setStaleDemo(null);
+        setDemoGradeInput('9.9');
       });
-      await loadStudents();
-    });
+    } finally {
+      setTradeoffLoading(false);
+    }
   }
 
-  async function fetchHotStudent() {
-    const target = students[0]?.id;
-    if (!target) return;
+  async function primeTradeoffCache() {
+    setTradeoffLoading(true);
 
-    await handleAction(async () => {
-      const payload = await apiFetch(`/students/${target}`);
-      setSelectedStudent(payload.data);
-      setLastRequest(payload.meta);
-    });
+    try {
+      await handleAction(async () => {
+        const payload = await apiFetch('/cache/stale-demo/prime', {
+          method: 'POST',
+          body: { studentId: staleDemo?.studentId }
+        });
+        const nextGrade = nextDemoGrade(payload.data.primedRead.gradeAverage);
+        setStaleDemo(payload.data);
+        setDemoGradeInput(formatGrade(nextGrade));
+        setCache((current) => ({ ...current, enabled: true }));
+      });
+    } finally {
+      setTradeoffLoading(false);
+    }
   }
 
-  async function runBurst() {
-    const target = students[0]?.id;
-    if (!target) return;
+  async function editTradeoffDatabase() {
+    const studentId = staleDemo?.studentId;
+    if (!studentId) return;
 
-    await handleAction(async () => {
-      let lastPayload = null;
-      for (let index = 0; index < 6; index += 1) {
-        lastPayload = await apiFetch(`/students/${target}`);
-      }
-      setSelectedStudent(lastPayload.data);
-      setLastRequest(lastPayload.meta);
-    });
+    setTradeoffLoading(true);
+
+    try {
+      await handleAction(async () => {
+        const payload = await apiFetch('/cache/stale-demo/edit', {
+          method: 'POST',
+          body: {
+            studentId,
+            gradeAverage: demoGradeInput
+          }
+        });
+        setStaleDemo((current) => ({
+          ...(current ?? {}),
+          ...payload.data,
+          stale: false
+        }));
+      });
+    } finally {
+      setTradeoffLoading(false);
+    }
   }
 
-  async function clearCurrentCache() {
-    await handleAction(async () => {
-      const payload = await apiFetch('/cache/clear', { method: 'POST' });
-      setCache(payload.data);
-      setStaleDemo((current) => (current ? { ...current, repaired: true } : current));
-    });
+  async function requestTradeoffAgain() {
+    const studentId = staleDemo?.studentId;
+    if (!studentId) return;
+
+    setTradeoffLoading(true);
+
+    try {
+      await handleAction(async () => {
+        const payload = await apiFetch('/cache/stale-demo/read', {
+          method: 'POST',
+          body: { studentId }
+        });
+        setStaleDemo((current) => ({
+          ...(current ?? {}),
+          ...payload.data
+        }));
+      });
+    } finally {
+      setTradeoffLoading(false);
+    }
   }
 
-  async function resetMetrics() {
-    await handleAction(async () => {
-      const payload = await apiFetch('/metrics/reset', { method: 'POST' });
-      setMetrics(payload.data);
-      setCache(payload.data.cache);
-      setBenchmark(null);
-      setStaleDemo(null);
-      setLastRequest(null);
-    });
+  async function executeBenchmark(nextIterations = iterations) {
+    setBenchmarkLoading(true);
+
+    try {
+      await handleAction(async () => {
+        const payload = await apiFetch('/benchmark', {
+          method: 'POST',
+          body: { iterations: nextIterations }
+        });
+        setBenchmark(payload.data);
+      });
+    } finally {
+      setBenchmarkLoading(false);
+    }
   }
 
   async function runBenchmark() {
-    await handleAction(async () => {
-      const payload = await apiFetch('/benchmark', {
-        method: 'POST',
-        body: { iterations }
-      });
-      setBenchmark(payload.data);
-      await loadMetrics();
-    });
+    await executeBenchmark(iterations);
   }
 
-  async function runStaleDemo() {
-    await handleAction(async () => {
-      const payload = await apiFetch('/cache/stale-demo', {
-        method: 'POST',
-        body: {}
-      });
-      setStaleDemo(payload.data);
-      await loadMetrics();
-      setCache((current) => ({ ...current, enabled: true }));
-    });
-  }
-
-  const eventTableData = (metrics?.events ?? [])
-    .filter((event) => ['cache-hit', 'cache-miss', 'database-read'].includes(event.type))
-    .map((event) => [
-      new Date(event.at).toLocaleTimeString('pt-BR'),
-      benchmarkEventType(event.type),
-      benchmarkEventTarget(event.message),
-      benchmarkEventResult(event.type),
-      cache.backend ?? 'cache'
-    ]);
   const benchmarkReads = benchmark?.reads ?? [];
   const withoutCacheReads = benchmarkReads.filter((read) => read.phase === 'sem cache');
   const withCacheReads = benchmarkReads.filter((read) => read.phase === 'com cache');
-  const toReadTableData = (reads) => reads.map((read) => [
-    read.studentName ? `${read.studentId} - ${read.studentName}` : read.studentId,
-    read.readNumber,
-    formatMs(read.elapsedMs)
-  ]);
-  const withoutCacheTableData = toReadTableData(withoutCacheReads);
-  const withCacheTableData = toReadTableData(withCacheReads);
-  const benchmarkTableData = benchmarkReads.length ? [...withoutCacheTableData, ...withCacheTableData] : eventTableData;
-  const benchmarkTableHeaders = benchmarkReads.length
-    ? ['Aluno', 'Busca', 'Tempo']
-    : ['Hora', 'Tipo', 'Leitura', 'Resultado', 'Backend'];
-  const benchmarkTableColumns = benchmarkReads.length
-    ? [
-        { readOnly: true, width: 220 },
-        { readOnly: true, width: 64, className: 'htCenter' },
-        { readOnly: true, width: 96 }
-      ]
-    : [
-        { readOnly: true, width: 86 },
-        { readOnly: true, width: 82 },
-        { readOnly: true, width: 190 },
-        { readOnly: true, width: 160 },
-        { readOnly: true, width: 92 }
-      ];
+  const withoutCacheGroups = groupReadsBySearch(withoutCacheReads);
+  const withCacheGroups = groupReadsBySearch(withCacheReads);
   const benchmarkTableHits = benchmarkReads.length
     ? benchmarkReads.filter((read) => read.cacheMatch === 'hit').length
-    : (metrics?.cacheHits ?? 0);
+    : 0;
   const benchmarkTableMisses = benchmarkReads.length
     ? benchmarkReads.filter((read) => read.cacheMatch === 'miss' && read.phase === 'com cache').length
-    : (metrics?.cacheMisses ?? 0);
+    : 0;
   const benchmarkTableHitRate = benchmarkTableHits + benchmarkTableMisses
     ? (benchmarkTableHits / (benchmarkTableHits + benchmarkTableMisses)) * 100
     : 0;
   const totalBenchmarkRequests = (benchmark?.withoutCache?.requests ?? 0) + (benchmark?.withCache?.requests ?? 0);
   const benchmarkSpeedupFactor = benchmarkSpeedup(benchmark);
-  const staleStatus = staleDemo?.repaired ? 'Cache limpo' : staleDemo?.stale ? 'Inconsistencia detectada' : 'Aguardando teste';
+  const withoutCacheTotalMs = benchmarkTotalMs(benchmark?.withoutCache);
+  const withCacheTotalMs = benchmarkTotalMs(benchmark?.withCache);
+  const totalImprovementMs = withoutCacheTotalMs - withCacheTotalMs;
+  const hasPrimedRead = Boolean(staleDemo?.primedRead);
+  const hasDatabaseWrite = Boolean(staleDemo?.databaseWrite);
+  const hasCacheRead = Boolean(staleDemo?.cacheRead);
+  const hasStaleRisk = Boolean(staleDemo?.stale);
+  const targetStudent = staleDemo?.student
+    ?? staleDemo?.databaseStudent
+    ?? students.find((student) => student.id === staleDemo?.studentId)
+    ?? students[0];
+  const targetStudentLabel = targetStudent ? `${targetStudent.id} - ${targetStudent.name}` : '-';
+  const tradeoffCacheKey = staleDemo?.cacheKey ?? (targetStudent ? `students:${targetStudent.id}` : '-');
+  const primedGrade = hasPrimedRead
+    ? formatGrade(staleDemo.primedRead.gradeAverage)
+    : targetStudent
+      ? formatGrade(targetStudent.gradeAverage)
+      : '-';
+  const cachedGrade = hasCacheRead
+    ? formatGrade(staleDemo.cacheRead.gradeAverage)
+    : hasPrimedRead
+      ? formatGrade(staleDemo.primedRead.gradeAverage)
+      : '-';
+  const writtenGrade = hasDatabaseWrite ? formatGrade(staleDemo.databaseWrite.gradeAverage) : '-';
+  const databaseGrade = staleDemo?.databaseRead
+    ? formatGrade(staleDemo.databaseRead.gradeAverage)
+    : hasDatabaseWrite
+      ? writtenGrade
+      : primedGrade;
+  const gradeDelta = staleDemo?.databaseRead && staleDemo?.cacheRead
+    ? Math.abs(Number(staleDemo.databaseRead.gradeAverage) - Number(staleDemo.cacheRead.gradeAverage)).toFixed(1)
+    : '0.0';
+  const tradeoffStage = hasStaleRisk
+    ? 'stale'
+    : hasCacheRead
+      ? 'checked'
+      : hasDatabaseWrite
+        ? 'edited'
+        : hasPrimedRead
+          ? 'primed'
+          : 'idle';
+  const staleStatus = {
+    idle: 'Comece no banco',
+    primed: 'Redis preenchido',
+    edited: 'Banco editado',
+    checked: 'Consistente',
+    stale: 'Cache antigo'
+  }[tradeoffStage];
+  const tradeoffOutcomeTitle = {
+    idle: 'Clique no bloco 1 para carregar o registro padrao.',
+    primed: 'Primeira requisicao buscou no banco e gravou no Redis.',
+    edited: 'Banco mudou, mas o Redis ainda guarda o CR antigo.',
+    checked: 'A nova requisicao esta consistente.',
+    stale: 'Tradeoff visivel: a API retornou o dado antigo do Redis.'
+  }[tradeoffStage];
+  const tradeoffOutcomeText = {
+    idle: 'O mapa mostra o caminho cache aside sem executar tudo de uma vez.',
+    primed: `Chave ${tradeoffCacheKey} preenchida com CR ${primedGrade}.`,
+    edited: `Banco agora esta em CR ${writtenGrade}; Redis continua em CR ${cachedGrade}.`,
+    checked: staleDemo?.explanation ?? 'Cache e banco retornaram o mesmo valor.',
+    stale: `Redis respondeu CR ${cachedGrade}, banco esta em CR ${databaseGrade}; diferenca de ${gradeDelta} CR.`
+  }[tradeoffStage];
 
   return (
     <div className="app-shell">
@@ -339,7 +377,14 @@ function App() {
       {error && <div className="alert">{error}</div>}
 
       <main className="workspace">
-        <section className="surface benchmark-panel">
+        <section className={`surface benchmark-panel ${benchmarkLoading ? 'is-loading' : ''}`} aria-busy={benchmarkLoading}>
+          {benchmarkLoading && (
+            <div className="benchmark-loading" role="status" aria-live="polite">
+              <div className="benchmark-spinner" />
+              <strong>Executando benchmark</strong>
+              <span>Medindo as leituras com e sem cache...</span>
+            </div>
+          )}
           <div className="section-heading">
             <div>
               <span className="eyebrow">Benchmark</span>
@@ -370,23 +415,33 @@ function App() {
           <div className="comparison-bars">
             <div className="bar-row">
               <span>Sem cache</span>
-              <div className="bar-track">
-                <div
-                  className="bar-fill no-cache"
-                  style={{ width: `${((benchmark?.withoutCache?.avgMs ?? 0) / benchmarkScale) * 100}%` }}
-                />
+              <div className="bar-content">
+                <div className="bar-track">
+                  <div
+                    className="bar-fill no-cache"
+                    style={{ width: `${((benchmark?.withoutCache?.avgMs ?? 0) / benchmarkScale) * 100}%` }}
+                  />
+                </div>
+                <div className="bar-metric">
+                  <span>Media: <strong>{formatMs(benchmark?.withoutCache?.avgMs)}</strong></span>
+                  <span>Total: <strong>{formatMs(withoutCacheTotalMs)}</strong></span>
+                </div>
               </div>
-              <strong>{formatMs(benchmark?.withoutCache?.avgMs)}</strong>
             </div>
             <div className="bar-row">
               <span>Com cache</span>
-              <div className="bar-track">
-                <div
-                  className="bar-fill with-cache"
-                  style={{ width: `${((benchmark?.withCache?.avgMs ?? 0) / benchmarkScale) * 100}%` }}
-                />
+              <div className="bar-content">
+                <div className="bar-track">
+                  <div
+                    className="bar-fill with-cache"
+                    style={{ width: `${((benchmark?.withCache?.avgMs ?? 0) / benchmarkScale) * 100}%` }}
+                  />
+                </div>
+                <div className="bar-metric">
+                  <span>Media: <strong>{formatMs(benchmark?.withCache?.avgMs)}</strong></span>
+                  <span>Total: <strong>{formatMs(withCacheTotalMs)}</strong></span>
+                </div>
               </div>
-              <strong>{formatMs(benchmark?.withCache?.avgMs)}</strong>
             </div>
           </div>
 
@@ -400,6 +455,10 @@ function App() {
               <strong>{formatMs(benchmark?.improvementMs)}</strong>
             </div>
             <div>
+              <span>Ganho total</span>
+              <strong>{formatMs(totalImprovementMs)}</strong>
+            </div>
+            <div>
               <span>Vezes mais rapida</span>
               <strong>{formatSpeedup(benchmarkSpeedupFactor)}</strong>
             </div>
@@ -407,7 +466,7 @@ function App() {
 
           <div className="benchmark-details">
               <div className="benchmark-table-meta">
-                <span>{benchmarkTableData.length} registros</span>
+                <span>{benchmarkReads.length} registros</span>
                 <span>{benchmarkTableHits} hits</span>
                 <span>{benchmarkTableMisses} misses</span>
                 <span>{benchmarkTableHitRate.toFixed(1)}% hit</span>
@@ -449,320 +508,189 @@ function App() {
               </div>
               <div className={`benchmark-detail-body ${benchmarkExpanded ? 'is-open' : 'is-closed'}`}>
                 <div className="benchmark-detail-content">
-                  {benchmarkReads.length ? (
-                    <>
-                      {(withoutCacheExpanded || withCacheExpanded) && (
-                        <div className={`benchmark-table-grid ${withoutCacheExpanded && withCacheExpanded ? '' : 'has-single-table'}`}>
-                          {withoutCacheExpanded && (
-                            <div className="benchmark-table-card">
-                              <button
-                                className="table-toggle"
-                                type="button"
-                                onClick={() => setWithoutCacheExpanded(false)}
-                                aria-expanded={withoutCacheExpanded}
-                              >
-                                <strong>Sem cache</strong>
-                                <ChevronUp size={16} />
-                              </button>
-                              <div className="benchmark-hot-table">
-                                <HotTable
-                                  data={withoutCacheTableData}
-                                  colHeaders={benchmarkTableHeaders}
-                                  columns={benchmarkTableColumns}
-                                  width="100%"
-                                  height={Math.min(300, Math.max(170, withoutCacheTableData.length * 30 + 42))}
-                                  stretchH="all"
-                                  rowHeaders={false}
-                                  readOnly
-                                  autoColumnSize={false}
-                                  viewportColumnRenderingOffset={benchmarkTableHeaders.length}
-                                  rowHeights={30}
-                                  licenseKey="non-commercial-and-evaluation"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {withCacheExpanded && (
-                            <div className="benchmark-table-card">
-                              <button
-                                className="table-toggle"
-                                type="button"
-                                onClick={() => setWithCacheExpanded(false)}
-                                aria-expanded={withCacheExpanded}
-                              >
-                                <strong>Com cache</strong>
-                                <ChevronUp size={16} />
-                              </button>
-                              <div className="benchmark-hot-table">
-                                <HotTable
-                                  data={withCacheTableData}
-                                  colHeaders={benchmarkTableHeaders}
-                                  columns={benchmarkTableColumns}
-                                  width="100%"
-                                  height={Math.min(300, Math.max(170, withCacheTableData.length * 30 + 42))}
-                                  stretchH="all"
-                                  rowHeaders={false}
-                                  readOnly
-                                  autoColumnSize={false}
-                                  viewportColumnRenderingOffset={benchmarkTableHeaders.length}
-                                  rowHeights={30}
-                                  licenseKey="non-commercial-and-evaluation"
-                                />
-                              </div>
-                            </div>
-                          )}
+                  {benchmarkReads.length && (withoutCacheExpanded || withCacheExpanded) ? (
+                    <div className={`benchmark-table-grid ${withoutCacheExpanded && withCacheExpanded ? '' : 'has-single-table'}`}>
+                      {withoutCacheExpanded && (
+                        <div className="benchmark-table-card">
+                          <button
+                            className="table-toggle"
+                            type="button"
+                            onClick={() => setWithoutCacheExpanded(false)}
+                            aria-expanded={withoutCacheExpanded}
+                          >
+                            <strong>Sem cache</strong>
+                            <ChevronUp size={16} />
+                          </button>
+                          <BenchmarkSearchCards groups={withoutCacheGroups} />
                         </div>
                       )}
-                    </>
-                  ) : (
-                    <div className="benchmark-hot-table">
-                      <HotTable
-                        data={benchmarkTableData}
-                        colHeaders={benchmarkTableHeaders}
-                        columns={benchmarkTableColumns}
-                        width="100%"
-                        height={Math.min(340, Math.max(190, benchmarkTableData.length * 30 + 42))}
-                        stretchH="all"
-                        rowHeaders={false}
-                        readOnly
-                        autoColumnSize={false}
-                        viewportColumnRenderingOffset={benchmarkTableHeaders.length}
-                        rowHeights={30}
-                        licenseKey="non-commercial-and-evaluation"
-                      />
+
+                      {withCacheExpanded && (
+                        <div className="benchmark-table-card">
+                          <button
+                            className="table-toggle"
+                            type="button"
+                            onClick={() => setWithCacheExpanded(false)}
+                            aria-expanded={withCacheExpanded}
+                          >
+                            <strong>Com cache</strong>
+                            <ChevronUp size={16} />
+                          </button>
+                          <BenchmarkSearchCards groups={withCacheGroups} />
+                        </div>
+                      )}
                     </div>
+                  ) : (
+                    <div className="benchmark-empty-state">Sem leituras ainda</div>
                   )}
                 </div>
               </div>
           </div>
         </section>
 
-        <section className="surface consistency-panel">
+        <section className={`surface consistency-panel ${tradeoffLoading ? 'is-loading' : ''}`} aria-busy={tradeoffLoading}>
+          {tradeoffLoading && (
+            <div className="benchmark-loading tradeoff-loading" role="status" aria-live="polite">
+              <div className="benchmark-spinner" />
+              <strong>Movendo o mapa</strong>
+              <span>Executando a etapa selecionada...</span>
+            </div>
+          )}
           <div className="section-heading">
             <div>
               <span className="eyebrow">Tradeoff</span>
-              <h2>Tradeoff</h2>
+              <h2>Mapa cache aside</h2>
             </div>
-            <button className="primary-button" onClick={runStaleDemo} disabled={loading || !students.length} title="Simular cache inconsistente">
-              <AlertTriangle size={18} />
-              Simular
-            </button>
-          </div>
-
-          <FocusNote
-            measure="Cacheia um aluno, altera o banco direto sem invalidar e consulta a mesma chave novamente."
-            result="O ganho de velocidade vem com um custo: se a invalidacao falhar, o cache pode entregar dado antigo."
-          />
-
-          <div className="tradeoff-summary">
-            <div>
-              <strong>Ganho</strong>
-              <span>menos latencia e menos leitura no banco</span>
-            </div>
-            <div>
-              <strong>Custo</strong>
-              <span>risco de dado antigo ate invalidar, limpar ou expirar o TTL</span>
-            </div>
-          </div>
-
-          <div className={`stale-banner ${staleDemo?.stale && !staleDemo?.repaired ? 'is-stale' : ''}`}>
-            <strong>{staleStatus}</strong>
-            <span>{staleDemo?.cacheKey ?? 'Clique em simular para criar uma inconsistencia controlada.'}</span>
-          </div>
-
-          <div className="consistency-values">
-            <ConsistencyValue
-              label="Cache respondeu"
-              value={staleDemo ? `CR ${Number(staleDemo.cacheRead.gradeAverage).toFixed(1)}` : '-'}
-              tone={staleDemo?.stale && !staleDemo?.repaired ? 'stale' : 'neutral'}
-            />
-            <ConsistencyValue
-              label="Banco esta"
-              value={staleDemo ? `CR ${Number(staleDemo.databaseRead.gradeAverage).toFixed(1)}` : '-'}
-              tone="fresh"
-            />
-          </div>
-
-          <div className="consistency-flow">
-            <span>1. Leitura preenche o cache</span>
-            <span>2. Banco muda sem invalidar</span>
-            <span>3. Cache pode devolver dado antigo</span>
-          </div>
-
-          <button className="repair-button" onClick={clearCurrentCache} disabled={loading || !staleDemo} title="Limpar cache e corrigir a inconsistencia">
-            <Trash2 size={18} />
-            Corrigir limpando cache
-          </button>
-        </section>
-
-        <section className="surface crud-panel">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">CRUD</span>
-              <h2>CRUD</h2>
-            </div>
-            <span className={`source-pill source-${lastRequest?.source ?? 'api'} backend-${lastRequest?.cacheBackend ?? 'none'}`}>
-              {sourceLabel(lastRequest)}
-              {lastRequest?.elapsedMs ? ` · ${formatMs(lastRequest.elapsedMs)}` : ''}
-            </span>
-          </div>
-
-          <div className="command-grid">
-            <button onClick={loadStudents} disabled={loading} title="Listar alunos">
+            <button onClick={resetTradeoffMap} disabled={loading} title="Reiniciar mapa">
               <RefreshCcw size={18} />
-              Listar
-            </button>
-            <button onClick={fetchHotStudent} disabled={loading || !students.length} title="Consultar aluno individual">
-              <Search size={18} />
-              Buscar aluno
-            </button>
-            <button onClick={runBurst} disabled={loading || !students.length} title="Gerar leituras repetidas">
-              <BarChart3 size={18} />
-              Leituras repetidas
-            </button>
-            <button onClick={clearCurrentCache} disabled={loading} title="Limpar cache">
-              <Trash2 size={18} />
-              Limpar cache
-            </button>
-            <button onClick={resetMetrics} disabled={loading} title="Zerar metricas">
-              <RefreshCcw size={18} />
-              Zerar métricas
+              Reiniciar
             </button>
           </div>
 
-          <div className="cache-state">
+          <div className={`tradeoff-status ${hasStaleRisk ? 'is-stale' : tradeoffStage === 'checked' ? 'is-ok' : ''}`}>
             <div>
-              <span>Chaves no cache</span>
-              <strong>{cache.size ?? 0}</strong>
+              <span>Aluno</span>
+              <strong>{targetStudentLabel}</strong>
             </div>
             <div>
-              <span>Invalidações</span>
-              <strong>{metrics?.invalidations ?? 0}</strong>
+              <span>Chave Redis</span>
+              <strong>{tradeoffCacheKey}</strong>
             </div>
             <div>
-              <span>TTL</span>
-              <strong>{cache.ttlSeconds ?? 45}s</strong>
+              <span>Status</span>
+              <strong>{staleStatus}</strong>
             </div>
           </div>
 
-          {selectedStudent && (
-            <div className="selected-student">
-              <span>Aluno consultado</span>
-              <strong>{selectedStudent.name}</strong>
-              <small>{selectedStudent.course}</small>
-            </div>
-          )}
-
-          <div className="crud-layout">
-        <section className="form-panel">
-          <div className="section-heading compact">
-            <div>
-              <span className="eyebrow">CRUD</span>
-              <h2>{editingId ? 'Editar aluno' : 'Cadastrar aluno'}</h2>
-            </div>
-          </div>
-          <form onSubmit={saveStudent} className="student-form">
-            <label>
-              Nome
-              <input value={form.name} onChange={(event) => updateForm('name', event.target.value)} required />
-            </label>
-            <label>
-              E-mail
-              <input type="email" value={form.email} onChange={(event) => updateForm('email', event.target.value)} required />
-            </label>
-            <label>
-              Curso
-              <input value={form.course} onChange={(event) => updateForm('course', event.target.value)} required />
-            </label>
-            <div className="form-pair">
-              <label>
-                Período
-                <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={form.period}
-                  onChange={(event) => updateForm('period', event.target.value)}
-                />
-              </label>
-              <label>
-                CR
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                  value={form.gradeAverage}
-                  onChange={(event) => updateForm('gradeAverage', event.target.value)}
-                />
-              </label>
-            </div>
-            <div className="form-actions">
-              <button className="primary-button" type="submit" disabled={loading} title={editingId ? 'Salvar com PUT' : 'Cadastrar com POST'}>
-                {editingId ? <Save size={18} /> : <Plus size={18} />}
-                {editingId ? 'Salvar PUT' : 'Cadastrar POST'}
+          <div className="tradeoff-map">
+            <article className={`map-node is-database ${tradeoffStage === 'idle' ? 'is-active' : ''} ${hasPrimedRead ? 'is-done' : ''}`}>
+              <header>
+                <span>1</span>
+                <Database size={20} />
+                <b>Banco</b>
+              </header>
+              <strong>Registro padrao</strong>
+              <p title={targetStudentLabel}>{targetStudentLabel}</p>
+              <div className="map-value">
+                <span>CR</span>
+                <strong>{primedGrade}</strong>
+              </div>
+              <button className="primary-button map-action" onClick={primeTradeoffCache} disabled={loading || !students.length} title="Buscar no banco e preencher o Redis">
+                <Play size={17} />
+                {hasPrimedRead ? 'Buscar de novo' : 'Pegar do banco'}
               </button>
-              {editingId && (
-                <button type="button" onClick={resetForm} disabled={loading} title="Cancelar edicao">
-                  Cancelar
+            </article>
+
+            <div className={`map-arrow ${hasPrimedRead ? 'is-active' : ''}`} aria-hidden="true">
+              <ArrowRight size={26} />
+              <span>miss + set</span>
+            </div>
+
+            <article className={`map-node is-redis ${hasPrimedRead ? 'is-done' : ''} ${hasStaleRisk ? 'is-stale' : ''}`}>
+              <header>
+                <span>2</span>
+                <Server size={20} />
+                <b>Redis</b>
+              </header>
+              <strong>Cache preenchido</strong>
+              <p title={tradeoffCacheKey}>{tradeoffCacheKey}</p>
+              <div className="map-value">
+                <span>CR salvo</span>
+                <strong>{cachedGrade}</strong>
+              </div>
+              <div className="map-chip">{hasPrimedRead ? 'hit pronto' : 'vazio'}</div>
+            </article>
+
+            <div className={`map-arrow ${hasDatabaseWrite ? 'is-active' : ''}`} aria-hidden="true">
+              <ArrowRight size={26} />
+              <span>banco muda</span>
+            </div>
+
+            <article className={`map-node is-edit ${hasPrimedRead && !hasDatabaseWrite ? 'is-active' : ''} ${hasDatabaseWrite ? 'is-done' : ''}`}>
+              <header>
+                <span>3</span>
+                <PencilLine size={20} />
+                <b>Editar</b>
+              </header>
+              <strong>Alterar so no banco</strong>
+              <p>Redis nao invalida nessa etapa.</p>
+              <div className="map-editor">
+                <label>
+                  Novo CR
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    value={demoGradeInput}
+                    onChange={(event) => setDemoGradeInput(event.target.value)}
+                    disabled={!hasPrimedRead || loading}
+                  />
+                </label>
+                <button className="map-action" onClick={editTradeoffDatabase} disabled={loading || !hasPrimedRead} title="Editar o CR direto no banco">
+                  <PencilLine size={17} />
+                  Editar
                 </button>
-              )}
-            </div>
-          </form>
-        </section>
+              </div>
+              <div className="map-value">
+                <span>Banco</span>
+                <strong>{writtenGrade}</strong>
+              </div>
+            </article>
 
-        <section className="students-panel">
-          <div className="section-heading compact">
+            <div className={`map-arrow ${hasCacheRead ? 'is-active' : ''}`} aria-hidden="true">
+              <ArrowRight size={26} />
+              <span>request</span>
+            </div>
+
+            <article className={`map-node is-request ${hasDatabaseWrite && !hasCacheRead ? 'is-active' : ''} ${hasCacheRead && !hasStaleRisk ? 'is-done' : ''} ${hasStaleRisk ? 'is-stale' : ''}`}>
+              <header>
+                <span>4</span>
+                <Send size={20} />
+                <b>API</b>
+              </header>
+              <strong>Requisitar de novo</strong>
+              <p>{hasCacheRead ? `Fonte: ${staleDemo.cacheRead.source}` : 'A API consulta a mesma chave.'}</p>
+              <div className="map-value">
+                <span>Retorno</span>
+                <strong>{hasCacheRead ? cachedGrade : '-'}</strong>
+              </div>
+              <button className="primary-button map-action" onClick={requestTradeoffAgain} disabled={loading || !hasDatabaseWrite} title="Consultar a mesma chave novamente">
+                <Send size={17} />
+                Requisitar
+              </button>
+            </article>
+          </div>
+
+          <div className={`tradeoff-callout ${hasStaleRisk ? 'is-stale' : tradeoffStage === 'checked' ? 'is-ok' : ''}`}>
+            {hasStaleRisk ? <AlertTriangle size={22} /> : <Server size={22} />}
             <div>
-              <span className="eyebrow">Dados</span>
-              <h2>Alunos</h2>
+              <strong>{tradeoffOutcomeTitle}</strong>
+              <span>{tradeoffOutcomeText}</span>
             </div>
-            <span>{students.length} registros</span>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Curso</th>
-                  <th>Período</th>
-                  <th>CR</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((student) => (
-                  <tr key={student.id}>
-                    <td>
-                      <strong>{student.name}</strong>
-                      <span>{student.email}</span>
-                    </td>
-                    <td>{student.course}</td>
-                    <td>{student.period}</td>
-                    <td>{Number(student.gradeAverage).toFixed(1)}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button onClick={() => startEdit(student)} disabled={loading} title="Editar aluno">
-                          <Save size={16} />
-                        </button>
-                        <button onClick={() => patchGrade(student)} disabled={loading} title="PATCH no CR">
-                          <Activity size={16} />
-                        </button>
-                        <button onClick={() => deleteStudent(student.id)} disabled={loading} title="Remover aluno">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </section>
 
-          </div>
-        </section>
 
       </main>
     </div>

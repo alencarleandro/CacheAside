@@ -45,6 +45,7 @@ async function runPhase(iterations, students, phase) {
   if (!times.length) {
     return {
       requests: 0,
+      totalMs: 0,
       avgMs: 0,
       minMs: 0,
       maxMs: 0,
@@ -55,6 +56,7 @@ async function runPhase(iterations, students, phase) {
   const total = times.reduce((sum, value) => sum + value, 0);
   return {
     requests: times.length,
+    totalMs: round(total),
     avgMs: round(total / times.length),
     minMs: round(Math.min(...times)),
     maxMs: round(Math.max(...times)),

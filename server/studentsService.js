@@ -66,6 +66,11 @@ function parseId(rawId) {
   return id;
 }
 
+function nextDemoGrade(currentGrade) {
+  const grade = Number(currentGrade);
+  return Number((grade >= 9.8 ? grade - 0.4 : grade + 0.4).toFixed(1));
+}
+
 async function invalidateStudentCache(id, reason) {
   await invalidateKeys([LIST_KEY, studentKey(id)], reason);
 }
@@ -113,7 +118,7 @@ export async function removeStudent(rawId) {
   return removed;
 }
 
-export async function simulateCacheInconsistency(rawId) {
+export async function primeStaleDemo(rawId) {
   const id = rawId ? parseId(rawId) : await peekFirstStudentId();
   if (!id) throw notFound('Nenhum aluno disponivel para demonstrar inconsistencia.');
 
@@ -125,9 +130,53 @@ export async function simulateCacheInconsistency(rawId) {
 
   const primedRead = await getStudent(id);
   const oldGrade = Number(primedRead.data.gradeAverage);
-  const nextGrade = Number((oldGrade >= 9.8 ? oldGrade - 0.4 : oldGrade + 0.4).toFixed(1));
 
-  const databaseWrite = await updatePartialStudent(id, { gradeAverage: nextGrade });
+  addEvent('cache-stale-prime', `Cache preparado para aluno ${id}: CR ${oldGrade}`);
+
+  return {
+    studentId: id,
+    cacheKey: studentKey(id),
+    student: primedRead.data,
+    primedRead: {
+      source: primedRead.source,
+      cacheBackend: primedRead.cacheBackend,
+      gradeAverage: oldGrade
+    },
+    explanation: 'Primeira leitura: miss no Redis, busca no banco e grava a chave no cache.'
+  };
+}
+
+export async function editStaleDemoDatabase(rawId, payload = {}) {
+  const id = rawId ? parseId(rawId) : await peekFirstStudentId();
+  if (!id) throw notFound('Nenhum aluno disponivel para demonstrar inconsistencia.');
+
+  const currentStudent = await findStudentById(id);
+  const patch = payload.gradeAverage === undefined
+    ? { gradeAverage: nextDemoGrade(currentStudent.gradeAverage) }
+    : normalizeStudent({ gradeAverage: payload.gradeAverage }, true);
+
+  const databaseWrite = await updatePartialStudent(id, patch);
+
+  addEvent(
+    'cache-stale-write',
+    `Banco alterado sem invalidar cache: aluno ${id} CR ${databaseWrite.gradeAverage}`
+  );
+
+  return {
+    studentId: id,
+    cacheKey: studentKey(id),
+    databaseStudent: databaseWrite,
+    databaseWrite: {
+      gradeAverage: databaseWrite.gradeAverage
+    },
+    explanation: 'O banco mudou, mas a chave do Redis continua com o valor antigo.'
+  };
+}
+
+export async function readStaleDemoAgain(rawId) {
+  const id = rawId ? parseId(rawId) : await peekFirstStudentId();
+  if (!id) throw notFound('Nenhum aluno disponivel para demonstrar inconsistencia.');
+
   const cacheRead = await getStudent(id);
   const databaseRead = await findStudentById(id);
   const stale = Number(cacheRead.data.gradeAverage) !== Number(databaseRead.gradeAverage);
@@ -142,22 +191,30 @@ export async function simulateCacheInconsistency(rawId) {
   return {
     studentId: id,
     cacheKey: studentKey(id),
+    databaseStudent: databaseRead,
     stale,
-    primedRead: {
-      source: primedRead.source,
-      gradeAverage: oldGrade
-    },
-    databaseWrite: {
-      gradeAverage: databaseWrite.gradeAverage
-    },
     cacheRead: {
       source: cacheRead.source,
+      cacheBackend: cacheRead.cacheBackend,
       gradeAverage: cacheRead.data.gradeAverage
     },
     databaseRead: {
       source: 'database',
       gradeAverage: databaseRead.gradeAverage
     },
-    explanation: 'Uma escrita externa alterou o banco sem invalidar o cache. Enquanto a chave nao expira ou nao e limpa, a API pode devolver dado antigo.'
+    explanation: stale
+      ? 'A nova requisicao encontrou a chave no Redis e devolveu o CR antigo.'
+      : 'A nova requisicao esta consistente: o cache expirou, foi limpo ou recebeu o valor atualizado.'
+  };
+}
+
+export async function simulateCacheInconsistency(rawId) {
+  const primed = await primeStaleDemo(rawId);
+  const nextGrade = nextDemoGrade(primed.primedRead.gradeAverage);
+
+  return {
+    ...primed,
+    ...(await editStaleDemoDatabase(primed.studentId, { gradeAverage: nextGrade })),
+    ...(await readStaleDemoAgain(primed.studentId))
   };
 }

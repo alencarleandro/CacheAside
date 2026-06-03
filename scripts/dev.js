@@ -36,7 +36,7 @@ function startProcess(args) {
 }
 
 startProcess(['server/index.js']);
-startProcess([viteBin]);
+startProcess([viteBin, '--configLoader', 'runner']);
 
 for (const child of processes) {
   child.on('exit', (code) => {
