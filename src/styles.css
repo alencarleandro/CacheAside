@@ -930,9 +930,18 @@ td span {
 
   .status-grid,
   .flow-grid,
-  .benchmark-table-grid,
   .code-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .benchmark-table-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .benchmark-hot-table .handsontable table {
+    min-width: 620px;
   }
 }
 
@@ -984,6 +993,6 @@ td span {
   }
 
   .benchmark-hot-table .handsontable table {
-    min-width: 500px;
+    min-width: 540px;
   }
 }
