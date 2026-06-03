@@ -1,69 +1,218 @@
-# Cache Aside e Performance de APIs
+<div align="center">
 
-Projeto academico em React + Node.js para demonstrar o padrao arquitetural Cache Aside em uma API RESTful de alunos.
+# Cache Aside
 
-## Como rodar
+API REST + dashboard React para demonstrar, medir e explicar o padrao arquitetural Cache Aside em uma aplicacao academica.
+
+![Cache Aside](https://img.shields.io/badge/Cache%20Aside-Arquitetura-D92D20?style=for-the-badge)
+![React](https://img.shields.io/badge/React-Frontend-111827?style=for-the-badge&logo=react)
+![Node.js](https://img.shields.io/badge/Node.js-API-2B211F?style=for-the-badge&logo=node.js)
+![Redis](https://img.shields.io/badge/Redis%20Compatible-Cache-D92D20?style=for-the-badge&logo=redis)
+![Postgres](https://img.shields.io/badge/Postgres-Banco-725F5B?style=for-the-badge&logo=postgresql)
+
+[Deploy no Render](https://cacheaside.onrender.com)
+
+</div>
+
+---
+
+## Visao Geral
+
+Este projeto foi criado para uma apresentacao de Engenharia de Software sobre **Cache Aside** e performance de APIs.
+
+A aplicacao simula uma API academica de alunos com CRUD completo e mostra, em tempo real, a diferenca entre consultas com cache e sem cache. O foco nao e apenas "ter cache", mas demonstrar o impacto arquitetural em latencia, carga no banco, consistencia e invalidacao.
+
+## O Que Da Para Demonstrar
+
+- CRUD REST completo com `POST`, `GET`, `PUT`, `PATCH` e `DELETE`.
+- Cache Aside em consultas frequentes de lista e aluno individual.
+- Toggle para ligar e desligar o cache durante a apresentacao.
+- Benchmark comparando tempo medio com cache e sem cache.
+- Contadores de cache hit, cache miss, leituras no banco e invalidacoes.
+- Invalidação de cache apos escrita para evitar dado antigo.
+- Uso de Redis/Key Value quando configurado, com fallback em memoria.
+- Uso de Postgres/Supabase como banco principal, com fallback para JSON local.
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+  UI["React Dashboard"] --> API["Node.js / Express API"]
+  API --> TOGGLE{"Cache ligado?"}
+  TOGGLE -->|"Sim"| CACHE["Redis / Key Value / Memoria"]
+  CACHE -->|"Hit"| API
+  CACHE -->|"Miss"| DB["Postgres / Supabase"]
+  TOGGLE -->|"Nao"| DB
+  DB --> API
+  API --> UI
+
+  classDef red fill:#ffe1dc,stroke:#d92d20,color:#211715;
+  classDef dark fill:#2b211f,stroke:#2b211f,color:#ffffff;
+  classDef soft fill:#fff4f1,stroke:#ead1cc,color:#211715;
+
+  class CACHE,TOGGLE red;
+  class API dark;
+  class UI,DB soft;
+```
+
+## Como o Cache Aside Funciona Aqui
+
+1. A API recebe uma consulta, por exemplo `GET /api/students`.
+2. Se o cache estiver ligado, a API consulta primeiro a chave `students:list`.
+3. Se encontrar o dado, ocorre **cache hit** e a resposta volta sem acessar o banco.
+4. Se nao encontrar, ocorre **cache miss**.
+5. A API consulta o banco, salva o resultado no cache com TTL e retorna ao usuario.
+6. Em `POST`, `PUT`, `PATCH` ou `DELETE`, as chaves relacionadas sao invalidadas.
+
+## Trecho Principal do Cache
+
+Arquivo: `server/cache.js`
+
+```js
+const cached = await client.get(fullKey);
+
+if (cached) {
+  recordCacheHit(label);
+  return {
+    data: JSON.parse(cached),
+    source: 'cache',
+    cacheBackend: 'redis',
+    cacheKey: key
+  };
+}
+
+recordCacheMiss(label);
+const data = await loader();
+
+await client.set(fullKey, JSON.stringify(data), {
+  EX: DEFAULT_TTL_SECONDS
+});
+```
+
+## Invalidação Apos Escrita
+
+Arquivo: `server/studentsService.js`
+
+```js
+async function invalidateStudentCache(id, reason) {
+  await invalidateKeys(['students:list', `students:${id}`], reason);
+}
+```
+
+Essa decisao e importante porque Cache Aside melhora desempenho, mas exige cuidado com consistencia. Toda escrita remove as leituras antigas do cache.
+
+## Rodando Localmente
 
 ```bash
 npm install
 npm run dev
 ```
 
-- Frontend: http://127.0.0.1:5173
-- API: http://127.0.0.1:3001/api
+URLs locais:
 
-Para usar Redis local, configure o arquivo `.env` com:
+- Frontend: `http://127.0.0.1:5173`
+- API: `http://127.0.0.1:3001/api`
+
+Para servir o build de producao pela propria API:
 
 ```bash
+npm run build
+npm run start
+```
+
+## Variaveis de Ambiente
+
+Crie um arquivo `.env` com base no `.env.example`.
+
+```env
 REDIS_URL=redis://localhost:6379
 CACHE_TTL_SECONDS=45
 CACHE_NAMESPACE=cache-aside:students
-```
-
-Para usar Supabase/Postgres como banco principal, configure:
-
-```bash
 DATABASE_URL=postgres://postgres:SUA_SENHA@db.seu-projeto.supabase.co:5432/postgres
 DATABASE_SSL=true
 ```
 
-## O que o projeto demonstra
+### Observacoes
 
-- CRUD completo de alunos com `POST`, `GET`, `PUT`, `PATCH` e `DELETE`.
-- Cache Aside em consultas frequentes de lista e aluno individual usando Redis, com fallback em memoria.
-- Banco principal em Postgres/Supabase, com fallback para JSON local.
-- Alternancia entre cache ligado e cache desligado.
-- Cache hit, cache miss e invalidacao apos escrita.
-- Tempo medio com cache e sem cache.
-- Quantidade de consultas atendidas pelo cache e pelo banco.
-- Benchmark comparativo com leituras repetidas.
+- Se `REDIS_URL` nao estiver configurada ou falhar, o projeto usa cache em memoria.
+- Se `DATABASE_URL` nao estiver configurada ou falhar, o projeto usa o JSON local em `server/data/students.json`.
+- Isso deixa a apresentacao resiliente mesmo sem Redis ou banco externo ativos.
 
-## Arquitetura
+## Deploy no Render
 
-```mermaid
-flowchart LR
-  UI[React Dashboard] --> API[Node.js / Express API]
-  API --> C{Cache ligado?}
-  C -->|Sim| M[Redis / fallback em memoria]
-  M -->|Hit| API
-  M -->|Miss| DB[Postgres / fallback JSON]
-  C -->|Nao| DB
-  DB --> API
-  API --> UI
+Configuracao recomendada para **Web Service**:
+
+| Campo | Valor |
+| --- | --- |
+| Language | `Node` |
+| Branch | `main` |
+| Root Directory | vazio |
+| Build Command | `npm ci && npm run build` |
+| Start Command | `npm run start` |
+
+Variaveis no Render:
+
+```env
+REDIS_URL=URL_DO_KEY_VALUE_DO_RENDER
+CACHE_TTL_SECONDS=45
+CACHE_NAMESPACE=cache-aside:students
+DATABASE_URL=postgres://postgres:SUA_SENHA@db.seu-projeto.supabase.co:5432/postgres
+DATABASE_SSL=true
 ```
 
-O banco principal pode ser o Postgres do Supabase. O JSON local fica como fallback para a apresentacao continuar funcionando se a rede ou o banco externo estiverem indisponiveis. O cache usa Redis quando configurado e tambem possui fallback em memoria.
+Se nao quiser Redis externo no Render, deixe `REDIS_URL` vazio e o app usa memoria.
 
-## Endpoints principais
+## Endpoints Principais
 
-- `GET /api/students`
-- `GET /api/students/:id`
-- `POST /api/students`
-- `PUT /api/students/:id`
-- `PATCH /api/students/:id`
-- `DELETE /api/students/:id`
-- `PATCH /api/cache`
-- `POST /api/cache/clear`
-- `GET /api/metrics`
-- `POST /api/metrics/reset`
-- `POST /api/benchmark`
+| Metodo | Endpoint | Objetivo |
+| --- | --- | --- |
+| `GET` | `/api/health` | Verificar status da API, cache e banco |
+| `GET` | `/api/students` | Listar alunos com Cache Aside |
+| `GET` | `/api/students/:id` | Consultar aluno individual |
+| `POST` | `/api/students` | Criar aluno e invalidar cache |
+| `PUT` | `/api/students/:id` | Substituir aluno e invalidar cache |
+| `PATCH` | `/api/students/:id` | Atualizar parte do aluno e invalidar cache |
+| `DELETE` | `/api/students/:id` | Remover aluno e invalidar cache |
+| `PATCH` | `/api/cache` | Ligar ou desligar cache |
+| `POST` | `/api/cache/clear` | Limpar cache manualmente |
+| `GET` | `/api/metrics` | Consultar metricas da demonstracao |
+| `POST` | `/api/benchmark` | Executar comparativo com e sem cache |
+
+## Roteiro Para Apresentacao
+
+1. Abra o dashboard.
+2. Clique em **Zerar metricas**.
+3. Clique em **Listar** uma vez e mostre o cache miss.
+4. Clique em **Listar** de novo e mostre o cache hit.
+5. Use **Leituras repetidas** para aumentar o hit rate.
+6. Rode o **Benchmark controlado** e compare as barras.
+7. Edite um aluno com `PATCH` e mostre a invalidacao.
+8. Rode a consulta de novo e explique por que o primeiro acesso volta ao banco.
+
+## Discussao Arquitetural
+
+| Tema | O que discutir |
+| --- | --- |
+| Performance | Leituras repetidas deixam de bater no banco |
+| Consistencia | Escritas invalidam chaves relacionadas |
+| Complexidade | O sistema precisa controlar TTL, falhas e invalidacao |
+| Resiliencia | Redis e Postgres possuem fallback para manter a demo ativa |
+| Observabilidade | O painel mostra hit, miss, tempo medio e consultas ao banco |
+
+## Tecnologias
+
+- React
+- Vite
+- Node.js
+- Express
+- Redis compatible cache
+- Postgres/Supabase
+- Render
+
+---
+
+<div align="center">
+
+**Tema visual:** vermelho inspirado no ecossistema Redis, aplicado ao dashboard e aos indicadores de cache.
+
+</div>
