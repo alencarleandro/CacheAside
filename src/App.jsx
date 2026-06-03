@@ -3,6 +3,8 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  ChevronDown,
+  ChevronUp,
   Code2,
   Play,
   Plus,
@@ -105,6 +107,7 @@ function App() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [lastRequest, setLastRequest] = useState(null);
   const [benchmark, setBenchmark] = useState(null);
+  const [benchmarkExpanded, setBenchmarkExpanded] = useState(false);
   const [staleDemo, setStaleDemo] = useState(null);
   const [iterations, setIterations] = useState(12);
   const [loading, setLoading] = useState(false);
@@ -277,6 +280,9 @@ function App() {
   }
 
   const visibleEvents = (metrics?.events ?? []).filter((event) => !hiddenEventTypes.has(event.type));
+  const benchmarkDetailEvents = (metrics?.events ?? [])
+    .filter((event) => ['cache-hit', 'cache-miss', 'database-read'].includes(event.type))
+    .slice(0, 12);
   const totalBenchmarkRequests = (benchmark?.withoutCache?.requests ?? 0) + (benchmark?.withCache?.requests ?? 0);
   const benchmarkSpeedupFactor = benchmarkSpeedup(benchmark);
   const staleStatus = staleDemo?.repaired ? 'Cache limpo' : staleDemo?.stale ? 'Inconsistencia detectada' : 'Aguardando teste';
@@ -360,6 +366,59 @@ function App() {
               <strong>{formatSpeedup(benchmarkSpeedupFactor)}</strong>
             </div>
           </div>
+
+          <button
+            className="expand-button"
+            type="button"
+            onClick={() => setBenchmarkExpanded((current) => !current)}
+            aria-expanded={benchmarkExpanded}
+            title={benchmarkExpanded ? 'Recolher detalhes' : 'Expandir detalhes'}
+          >
+            {benchmarkExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
+
+          {benchmarkExpanded && (
+            <div className="benchmark-details">
+              <div className="detail-metrics">
+                <div>
+                  <span>Sem cache</span>
+                  <strong>{benchmark?.withoutCache?.requests ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Com cache</span>
+                  <strong>{benchmark?.withCache?.requests ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Cache hits</span>
+                  <strong>{metrics?.cacheHits ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Cache misses</span>
+                  <strong>{metrics?.cacheMisses ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Taxa hit</span>
+                  <strong>{Number(metrics?.cacheHitRate ?? 0).toFixed(1)}%</strong>
+                </div>
+                <div>
+                  <span>Backend</span>
+                  <strong>{cache.backend ?? 'cache'}</strong>
+                </div>
+              </div>
+
+              <ol className="benchmark-trace">
+                {benchmarkDetailEvents.map((event) => (
+                  <li key={event.id}>
+                    <span className={`event-dot event-${event.type}`} />
+                    <div>
+                      <strong>{event.message}</strong>
+                      <time>{new Date(event.at).toLocaleTimeString('pt-BR')}</time>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </section>
 
         <section className="surface consistency-panel">
