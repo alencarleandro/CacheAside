@@ -501,6 +501,24 @@ h2 {
   padding: 7px 10px;
 }
 
+.benchmark-table-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.benchmark-table-card {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.benchmark-table-card > strong {
+  color: var(--redis-dark);
+  font-size: 0.88rem;
+}
+
 .benchmark-hot-table {
   width: 100%;
   min-width: 0;
@@ -523,7 +541,7 @@ h2 {
 }
 
 .benchmark-hot-table .handsontable table {
-  min-width: 620px;
+  min-width: 540px;
 }
 
 .benchmark-hot-table .handsontable th {
@@ -912,6 +930,7 @@ td span {
 
   .status-grid,
   .flow-grid,
+  .benchmark-table-grid,
   .code-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -945,6 +964,7 @@ td span {
   .status-grid,
   .flow-grid,
   .benchmark-summary,
+  .benchmark-table-grid,
   .cache-state,
   .command-grid,
   .form-pair,
@@ -964,6 +984,6 @@ td span {
   }
 
   .benchmark-hot-table .handsontable table {
-    min-width: 540px;
+    min-width: 500px;
   }
 }

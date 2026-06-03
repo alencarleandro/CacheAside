@@ -319,8 +319,10 @@ function App() {
       benchmarkEventResult(event.type),
       cache.backend ?? 'cache'
     ]);
-  const readTableData = (benchmark?.reads ?? []).map((read) => [
-    read.phase,
+  const benchmarkReads = benchmark?.reads ?? [];
+  const withoutCacheReads = benchmarkReads.filter((read) => read.phase === 'sem cache');
+  const withCacheReads = benchmarkReads.filter((read) => read.phase === 'com cache');
+  const toReadTableData = (reads) => reads.map((read) => [
     read.readNumber,
     formatMs(read.elapsedMs),
     read.source === 'cache' ? 'cache' : 'banco',
@@ -328,13 +330,14 @@ function App() {
     read.cacheBackend ?? '-',
     read.cacheKey ?? '-'
   ]);
-  const benchmarkTableData = readTableData.length ? readTableData : eventTableData;
-  const benchmarkTableHeaders = readTableData.length
-    ? ['Fase', 'Leitura', 'Tempo', 'Origem', 'Match', 'Backend', 'Chave']
+  const withoutCacheTableData = toReadTableData(withoutCacheReads);
+  const withCacheTableData = toReadTableData(withCacheReads);
+  const benchmarkTableData = benchmarkReads.length ? [...withoutCacheTableData, ...withCacheTableData] : eventTableData;
+  const benchmarkTableHeaders = benchmarkReads.length
+    ? ['Leitura', 'Tempo', 'Origem', 'Match', 'Backend', 'Chave']
     : ['Hora', 'Tipo', 'Leitura', 'Resultado', 'Backend'];
-  const benchmarkTableColumns = readTableData.length
+  const benchmarkTableColumns = benchmarkReads.length
     ? [
-        { readOnly: true, width: 96 },
         { readOnly: true, width: 72, className: 'htCenter' },
         { readOnly: true, width: 86 },
         { readOnly: true, width: 82 },
@@ -349,11 +352,11 @@ function App() {
         { readOnly: true, width: 160 },
         { readOnly: true, width: 92 }
       ];
-  const benchmarkTableHits = readTableData.length
-    ? (benchmark?.reads ?? []).filter((read) => read.cacheMatch === 'hit').length
+  const benchmarkTableHits = benchmarkReads.length
+    ? benchmarkReads.filter((read) => read.cacheMatch === 'hit').length
     : (metrics?.cacheHits ?? 0);
-  const benchmarkTableMisses = readTableData.length
-    ? (benchmark?.reads ?? []).filter((read) => read.cacheMatch === 'miss' && read.phase === 'com cache').length
+  const benchmarkTableMisses = benchmarkReads.length
+    ? benchmarkReads.filter((read) => read.cacheMatch === 'miss' && read.phase === 'com cache').length
     : (metrics?.cacheMisses ?? 0);
   const benchmarkTableHitRate = benchmarkTableHits + benchmarkTableMisses
     ? (benchmarkTableHits / (benchmarkTableHits + benchmarkTableMisses)) * 100
@@ -460,22 +463,65 @@ function App() {
                 <span>{benchmarkTableMisses} misses</span>
                 <span>{benchmarkTableHitRate.toFixed(1)}% hit</span>
               </div>
-              <div className="benchmark-hot-table">
-                <HotTable
-                  data={benchmarkTableData}
-                  colHeaders={benchmarkTableHeaders}
-                  columns={benchmarkTableColumns}
-                  width="100%"
-                  height={Math.min(340, Math.max(190, benchmarkTableData.length * 30 + 42))}
-                  stretchH="all"
-                  rowHeaders={false}
-                  readOnly
-                  autoColumnSize={false}
-                  viewportColumnRenderingOffset={benchmarkTableHeaders.length}
-                  rowHeights={30}
-                  licenseKey="non-commercial-and-evaluation"
-                />
-              </div>
+              {benchmarkReads.length ? (
+                <div className="benchmark-table-grid">
+                  <div className="benchmark-table-card">
+                    <strong>Sem cache</strong>
+                    <div className="benchmark-hot-table">
+                      <HotTable
+                        data={withoutCacheTableData}
+                        colHeaders={benchmarkTableHeaders}
+                        columns={benchmarkTableColumns}
+                        width="100%"
+                        height={Math.min(300, Math.max(170, withoutCacheTableData.length * 30 + 42))}
+                        stretchH="all"
+                        rowHeaders={false}
+                        readOnly
+                        autoColumnSize={false}
+                        viewportColumnRenderingOffset={benchmarkTableHeaders.length}
+                        rowHeights={30}
+                        licenseKey="non-commercial-and-evaluation"
+                      />
+                    </div>
+                  </div>
+                  <div className="benchmark-table-card">
+                    <strong>Com cache</strong>
+                    <div className="benchmark-hot-table">
+                      <HotTable
+                        data={withCacheTableData}
+                        colHeaders={benchmarkTableHeaders}
+                        columns={benchmarkTableColumns}
+                        width="100%"
+                        height={Math.min(300, Math.max(170, withCacheTableData.length * 30 + 42))}
+                        stretchH="all"
+                        rowHeaders={false}
+                        readOnly
+                        autoColumnSize={false}
+                        viewportColumnRenderingOffset={benchmarkTableHeaders.length}
+                        rowHeights={30}
+                        licenseKey="non-commercial-and-evaluation"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="benchmark-hot-table">
+                  <HotTable
+                    data={benchmarkTableData}
+                    colHeaders={benchmarkTableHeaders}
+                    columns={benchmarkTableColumns}
+                    width="100%"
+                    height={Math.min(340, Math.max(190, benchmarkTableData.length * 30 + 42))}
+                    stretchH="all"
+                    rowHeaders={false}
+                    readOnly
+                    autoColumnSize={false}
+                    viewportColumnRenderingOffset={benchmarkTableHeaders.length}
+                    rowHeights={30}
+                    licenseKey="non-commercial-and-evaluation"
+                  />
+                </div>
+              )}
             </div>
           )}
         </section>
