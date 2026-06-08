@@ -11,6 +11,8 @@ const DEFAULT_TTL_SECONDS = Number(process.env.CACHE_TTL_SECONDS) || 45;
 const DEFAULT_TTL_MS = DEFAULT_TTL_SECONDS * 1000;
 const CACHE_NAMESPACE = process.env.CACHE_NAMESPACE || 'cache-aside:api';
 const REDIS_URL = process.env.REDIS_URL;
+const REDIS_USERNAME = process.env.REDIS_USERNAME;
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
 const REDIS_RETRY_INTERVAL_MS = 10_000;
 const memoryStore = new Map();
 
@@ -43,6 +45,16 @@ function now() {
   return Date.now();
 }
 
+function parseCachedValue(value) {
+  if (value === null) return null;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
 async function connectRedis() {
   if (!REDIS_URL) return null;
   if (redisReady && redisClient) return redisClient;
@@ -52,6 +64,8 @@ async function connectRedis() {
   lastRedisAttemptAt = now();
   redisClient = createClient({
     url: REDIS_URL,
+    username: REDIS_USERNAME || undefined,
+    password: REDIS_PASSWORD || undefined,
     socket: {
       connectTimeout: 2500,
       reconnectStrategy: false
@@ -93,13 +107,32 @@ async function getRedisClient() {
 }
 
 function memoryState() {
+  const timestamp = now();
+  const entries = [];
+
+  for (const [key, cached] of memoryStore.entries()) {
+    const ttlMs = cached.expiresAt - timestamp;
+
+    if (ttlMs <= 0) {
+      memoryStore.delete(key);
+      continue;
+    }
+
+    entries.push({
+      key,
+      value: clone(cached.value),
+      ttlMs
+    });
+  }
+
   return {
     enabled,
     ttlMs: DEFAULT_TTL_MS,
     ttlSeconds: DEFAULT_TTL_SECONDS,
     backend: 'memory',
-    size: memoryStore.size,
-    keys: [...memoryStore.keys()],
+    size: entries.length,
+    keys: entries.map((entry) => entry.key),
+    entries,
     redis: {
       configured: Boolean(REDIS_URL),
       connected: false,
@@ -127,13 +160,27 @@ export async function getCacheState() {
 
   try {
     const keys = await client.keys(`${CACHE_NAMESPACE}:*`);
+    const entries = await Promise.all(keys.map(async (key) => {
+      const [value, ttlMs] = await Promise.all([
+        client.get(key),
+        client.pTTL(key)
+      ]);
+
+      return {
+        key: key.replace(`${CACHE_NAMESPACE}:`, ''),
+        value: parseCachedValue(value),
+        ttlMs: ttlMs > 0 ? ttlMs : null
+      };
+    }));
+
     return {
       enabled,
       ttlMs: DEFAULT_TTL_MS,
       ttlSeconds: DEFAULT_TTL_SECONDS,
       backend: 'redis',
-      size: keys.length,
-      keys: keys.map((key) => key.replace(`${CACHE_NAMESPACE}:`, '')),
+      size: entries.length,
+      keys: entries.map((entry) => entry.key),
+      entries,
       redis: {
         configured: true,
         connected: true,

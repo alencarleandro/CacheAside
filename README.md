@@ -158,12 +158,15 @@ Variaveis no Render:
 
 ```env
 REDIS_URL=URL_DO_KEY_VALUE_DO_RENDER
+REDIS_USERNAME=
+REDIS_PASSWORD=SENHA_DO_KEY_VALUE_DO_RENDER
 CACHE_TTL_SECONDS=45
 CACHE_NAMESPACE=cache-aside:students
 DATABASE_URL=postgres://postgres:SUA_SENHA@db.seu-projeto.supabase.co:5432/postgres
 DATABASE_SSL=true
 ```
 
+Se a URL do Redis ja incluir usuario e senha, deixe `REDIS_USERNAME` e `REDIS_PASSWORD` vazios.
 Se nao quiser Redis externo no Render, deixe `REDIS_URL` vazio e o app usa memoria.
 
 ## Endpoints Principais

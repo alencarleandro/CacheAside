@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
-  Play
+  Play,
+  Trash2
 } from 'lucide-react';
-import { apiFetch } from './api.js';
+import { apiFetch, CACHE_UPDATED_EVENT } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
 
 const INITIAL_BENCHMARK_REPETITIONS = 1;
@@ -68,6 +69,11 @@ function readStudentLabel(read) {
   return read.studentName ? `${read.studentId} - ${read.studentName}` : read.studentId;
 }
 
+function formatCacheValue(value) {
+  if (value === undefined) return '-';
+  return JSON.stringify(value, null, 2);
+}
+
 function BenchmarkSearchCards({ groups }) {
   return (
     <div className="benchmark-search-list">
@@ -107,7 +113,7 @@ function FocusNote({ measure, result }) {
 function App() {
   const [students, setStudents] = useState([]);
   const [metrics, setMetrics] = useState(null);
-  const [cache, setCache] = useState({ enabled: true, size: 0, keys: [] });
+  const [cache, setCache] = useState({ enabled: true, size: 0, keys: [], entries: [] });
   const [benchmark, setBenchmark] = useState(null);
   const [benchmarkExpanded, setBenchmarkExpanded] = useState(false);
   const [withoutCacheExpanded, setWithoutCacheExpanded] = useState(true);
@@ -115,6 +121,7 @@ function App() {
   const [iterations, setIterations] = useState(INITIAL_BENCHMARK_REPETITIONS);
   const [loading, setLoading] = useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
+  const [cacheLoading, setCacheLoading] = useState(false);
   const [error, setError] = useState('');
 
   const benchmarkScale = useMemo(() => {
@@ -124,9 +131,12 @@ function App() {
   }, [benchmark]);
 
   async function loadMetrics() {
-    const payload = await apiFetch('/metrics');
-    setMetrics(payload.data);
-    setCache(payload.data.cache);
+    const [metricsPayload, cachePayload] = await Promise.all([
+      apiFetch('/metrics', { syncCache: false }),
+      apiFetch('/cache', { syncCache: false })
+    ]);
+    setMetrics(metricsPayload.data);
+    setCache(cachePayload.data);
   }
 
   async function loadStudents() {
@@ -146,7 +156,16 @@ function App() {
   }
 
   useEffect(() => {
+    function updateCacheFromRequest(event) {
+      setCache(event.detail);
+    }
+
+    window.addEventListener(CACHE_UPDATED_EVENT, updateCacheFromRequest);
     refreshDashboard();
+
+    return () => {
+      window.removeEventListener(CACHE_UPDATED_EVENT, updateCacheFromRequest);
+    };
   }, []);
 
   async function handleAction(action) {
@@ -183,6 +202,19 @@ function App() {
     await executeBenchmark(iterations);
   }
 
+  async function clearCurrentCache() {
+    setCacheLoading(true);
+
+    try {
+      await handleAction(async () => {
+        const payload = await apiFetch('/cache/clear', { method: 'POST' });
+        setCache(payload.data);
+      });
+    } finally {
+      setCacheLoading(false);
+    }
+  }
+
   const benchmarkReads = benchmark?.reads ?? [];
   const withoutCacheReads = benchmarkReads.filter((read) => read.phase === 'sem cache');
   const withCacheReads = benchmarkReads.filter((read) => read.phase === 'com cache');
@@ -202,6 +234,14 @@ function App() {
   const withoutCacheTotalMs = benchmarkTotalMs(benchmark?.withoutCache);
   const withCacheTotalMs = benchmarkTotalMs(benchmark?.withCache);
   const totalImprovementMs = withoutCacheTotalMs - withCacheTotalMs;
+  const cacheEntries = cache.entries?.length
+    ? cache.entries
+    : (cache.keys ?? []).map((key) => ({
+        key,
+        value: undefined,
+        ttlMs: null
+      }));
+  const cacheBackendLabel = cache.backend === 'redis' ? 'Redis' : 'Memoria';
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -385,6 +425,64 @@ function App() {
                 </div>
               </div>
           </div>
+        </section>
+
+        <section className="surface cache-panel">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">Cache</span>
+              <h2>Dados atuais em cache</h2>
+            </div>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={clearCurrentCache}
+              disabled={loading || cache.size === 0}
+              title="Limpar todas as chaves do cache"
+            >
+              <Trash2 size={18} />
+              {cacheLoading ? 'Limpando...' : 'Limpar cache'}
+            </button>
+          </div>
+
+          <div className="cache-overview">
+            <div>
+              <span>Backend</span>
+              <strong>{cacheBackendLabel}</strong>
+            </div>
+            <div>
+              <span>Chaves</span>
+              <strong>{cache.size}</strong>
+            </div>
+            <div>
+              <span>TTL padrao</span>
+              <strong>{formatMs(cache.ttlMs)}</strong>
+            </div>
+          </div>
+
+          {cacheEntries.length ? (
+            <div className="cache-entry-list" aria-live="polite">
+              {cacheEntries.map((entry) => (
+                <article className="cache-entry" key={entry.key}>
+                  <header>
+                    <span>Expira em {entry.ttlMs ? formatMs(entry.ttlMs) : '-'}</span>
+                  </header>
+                  <div className="cache-entry-field">
+                    <span>Key</span>
+                    <code>{entry.key}</code>
+                  </div>
+                  <div className="cache-entry-field is-value">
+                    <span>Value</span>
+                    <pre>{formatCacheValue(entry.value)}</pre>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="cache-empty-state" aria-live="polite">
+              Nenhum dado armazenado no cache.
+            </div>
+          )}
         </section>
 
         <section className="surface consistency-panel">
