@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
+  ExternalLink,
   Play,
   Trash2
 } from 'lucide-react';
@@ -9,6 +10,7 @@ import { apiFetch, CACHE_UPDATED_EVENT } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
 
 const INITIAL_BENCHMARK_REPETITIONS = 1;
+const N8N_WORKFLOW_URL = 'https://n8n-kupm.onrender.com/workflow/W2MPm1fzBxBnbjHo?new=true';
 
 function formatMs(value) {
   const milliseconds = Number(value || 0);
@@ -489,8 +491,24 @@ function App() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">Tradeoff</span>
-              <h2>Tradeoff</h2>
+              <h2>n8n workflow</h2>
             </div>
+            <a
+              className="primary-button n8n-open-link"
+              href={N8N_WORKFLOW_URL}
+              target="_blank"
+              rel="noreferrer"
+              title="Abrir workflow no n8n"
+            >
+              <ExternalLink size={18} />
+              Abrir n8n
+            </a>
+          </div>
+          <div className="tradeoff-workflow-shell">
+            <iframe
+              title="Workflow n8n do tradeoff"
+              src={N8N_WORKFLOW_URL}
+            />
           </div>
         </section>
 

@@ -46,6 +46,8 @@ services:
 
       - key: N8N_SECURE_COOKIE
         value: true
+      - key: N8N_DISABLE_UI_SECURITY
+        value: true
 
 databases:
   - name: n8n-db

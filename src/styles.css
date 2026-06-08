@@ -925,6 +925,28 @@ h2 {
   position: relative;
 }
 
+.n8n-open-link {
+  min-height: 42px;
+  text-decoration: none;
+}
+
+.tradeoff-workflow-shell {
+  min-height: 620px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  overflow: hidden;
+}
+
+.tradeoff-workflow-shell iframe {
+  width: 100%;
+  height: min(76vh, 760px);
+  min-height: 620px;
+  border: 0;
+  background: #ffffff;
+  display: block;
+}
+
 @media (max-width: 1120px) {
   .presentation-grid,
   .workspace {
@@ -1004,6 +1026,15 @@ h2 {
   .cache-entry-field {
     grid-template-columns: 1fr;
     gap: 5px;
+  }
+
+  .n8n-open-link {
+    align-self: flex-start;
+  }
+
+  .tradeoff-workflow-shell,
+  .tradeoff-workflow-shell iframe {
+    min-height: 560px;
   }
 
 }
