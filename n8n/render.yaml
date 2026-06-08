@@ -8,26 +8,20 @@ services:
     envVars:
       - key: DB_TYPE
         value: postgresdb
+      - key: DATABASE_URL
+        value: 'postgresql://postgres.qyyoaibgniacbbalzjkz:2rEGSmWR9MC6afGb@aws-1-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true'
       - key: DB_POSTGRESDB_HOST
-        fromDatabase:
-          name: n8n-db
-          property: host
+        value: aws-1-us-west-2.pooler.supabase.com
       - key: DB_POSTGRESDB_PORT
-        fromDatabase:
-          name: n8n-db
-          property: port
+        value: 6543
       - key: DB_POSTGRESDB_DATABASE
-        fromDatabase:
-          name: n8n-db
-          property: database
+        value: postgres
       - key: DB_POSTGRESDB_USER
-        fromDatabase:
-          name: n8n-db
-          property: user
+        value: postgres.qyyoaibgniacbbalzjkz
       - key: DB_POSTGRESDB_PASSWORD
-        fromDatabase:
-          name: n8n-db
-          property: password
+        value: 2rEGSmWR9MC6afGb
+      - key: DB_POSTGRESDB_SSL_ENABLED
+        value: true
 
       - key: N8N_PORT
         value: 5678
@@ -52,7 +46,3 @@ services:
         value: '{"frame-ancestors":["''self''","https://cacheaside.onrender.com","http://localhost:8080","http://127.0.0.1:8080","http://127.0.0.1:8081"]}'
       - key: N8N_DISABLE_UI_SECURITY
         value: true
-
-databases:
-  - name: n8n-db
-    plan: free
