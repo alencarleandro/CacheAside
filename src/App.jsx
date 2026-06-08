@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
-  ExternalLink,
+  Maximize2,
+  Minimize2,
   Play,
   Trash2
 } from 'lucide-react';
@@ -124,6 +125,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
   const [cacheLoading, setCacheLoading] = useState(false);
+  const [n8nFullscreen, setN8nFullscreen] = useState(false);
   const [error, setError] = useState('');
 
   const benchmarkScale = useMemo(() => {
@@ -169,6 +171,17 @@ function App() {
       window.removeEventListener(CACHE_UPDATED_EVENT, updateCacheFromRequest);
     };
   }, []);
+
+  useEffect(() => {
+    if (!n8nFullscreen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [n8nFullscreen]);
 
   async function handleAction(action) {
     setLoading(true);
@@ -487,22 +500,21 @@ function App() {
           )}
         </section>
 
-        <section className="surface consistency-panel">
+        <section className={`surface consistency-panel ${n8nFullscreen ? 'is-n8n-fullscreen' : ''}`}>
           <div className="section-heading">
             <div>
               <span className="eyebrow">Tradeoff</span>
-              <h2>n8n workflow</h2>
             </div>
-            <a
-              className="primary-button n8n-open-link"
-              href={N8N_WORKFLOW_URL}
-              target="_blank"
-              rel="noreferrer"
-              title="Abrir workflow no n8n"
+            <button
+              className="primary-button n8n-fullscreen-toggle"
+              type="button"
+              onClick={() => setN8nFullscreen((current) => !current)}
+              aria-pressed={n8nFullscreen}
+              title={n8nFullscreen ? 'Voltar ao tamanho normal' : 'Expandir n8n em tela cheia'}
             >
-              <ExternalLink size={18} />
-              Abrir n8n
-            </a>
+              {n8nFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              {n8nFullscreen ? 'Voltar' : 'Tela cheia'}
+            </button>
           </div>
           <div className="tradeoff-workflow-shell">
             <iframe

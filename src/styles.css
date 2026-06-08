@@ -925,9 +925,24 @@ h2 {
   position: relative;
 }
 
-.n8n-open-link {
+.n8n-fullscreen-toggle {
   min-height: 42px;
-  text-decoration: none;
+}
+
+.consistency-panel.is-n8n-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  border-radius: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.consistency-panel.is-n8n-fullscreen .section-heading {
+  margin-bottom: 0;
 }
 
 .tradeoff-workflow-shell {
@@ -945,6 +960,15 @@ h2 {
   border: 0;
   background: #ffffff;
   display: block;
+}
+
+.consistency-panel.is-n8n-fullscreen .tradeoff-workflow-shell {
+  min-height: 0;
+}
+
+.consistency-panel.is-n8n-fullscreen .tradeoff-workflow-shell iframe {
+  height: 100%;
+  min-height: 0;
 }
 
 @media (max-width: 1120px) {
@@ -1028,7 +1052,7 @@ h2 {
     gap: 5px;
   }
 
-  .n8n-open-link {
+  .n8n-fullscreen-toggle {
     align-self: flex-start;
   }
 
