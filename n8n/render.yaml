@@ -1,9 +1,9 @@
 services:
   - type: web
     name: n8n
-    runtime: image
-    image:
-      url: docker.n8n.io/n8nio/n8n:latest
+    runtime: docker
+    dockerfilePath: ./n8n/Dockerfile
+    dockerContext: ./n8n
     plan: free
     envVars:
       - key: DB_TYPE
