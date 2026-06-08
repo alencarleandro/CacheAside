@@ -3,7 +3,7 @@ services:
     name: n8n
     runtime: image
     image:
-      url: docker.io/n8nio/n8n:latest
+      url: docker.n8n.io/n8nio/n8n:latest
     plan: free
     envVars:
       - key: DB_TYPE
