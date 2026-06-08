@@ -46,6 +46,10 @@ services:
 
       - key: N8N_SECURE_COOKIE
         value: true
+      - key: N8N_SAMESITE_COOKIE
+        value: none
+      - key: N8N_CONTENT_SECURITY_POLICY
+        value: '{"frame-ancestors":["''self''","https://cacheaside.onrender.com","http://localhost:8080","http://127.0.0.1:8080","http://127.0.0.1:8081"]}'
       - key: N8N_DISABLE_UI_SECURITY
         value: true
 
