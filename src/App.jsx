@@ -596,6 +596,7 @@ function App() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">Tradeoff</span>
+              <h2>Workflow n8n</h2>
             </div>
             <button
               className="primary-button n8n-fullscreen-toggle"
