@@ -132,6 +132,7 @@ Crie um arquivo `.env` com base no `.env.example`.
 REDIS_URL=redis://localhost:6379
 CACHE_TTL_SECONDS=45
 CACHE_NAMESPACE=cache-aside:students
+CACHE_DIRECT_PATTERNS=students:*,redis:students:*
 DATABASE_URL=postgresql://postgres.PROJECT_REF:SUA_SENHA@HOST_POOLER_SUPABASE:6543/postgres?pgbouncer=true
 DATABASE_SSL=true
 DATABASE_ALLOW_JSON_FALLBACK=false
@@ -140,6 +141,7 @@ DATABASE_ALLOW_JSON_FALLBACK=false
 ### Observacoes
 
 - Se `REDIS_URL` nao estiver configurada ou falhar, o projeto usa cache em memoria.
+- `CACHE_DIRECT_PATTERNS=students:*,redis:students:*` faz o painel tambem enxergar chaves salvas direto pelo n8n, como `students:1`, alem das chaves internas com namespace.
 - Se `DATABASE_URL` nao estiver configurada, o projeto usa o JSON local em `server/data/students.json`.
 - Se `DATABASE_URL` estiver configurada e falhar, a API nao usa JSON local por padrao. Para liberar fallback em dev, defina `DATABASE_ALLOW_JSON_FALLBACK=true`.
 - No Render com Supabase, use a connection string do **pooler** do Supabase. A URL direta `db.<projeto>.supabase.co:5432` pode falhar por IPv6.
@@ -164,6 +166,7 @@ REDIS_USERNAME=
 REDIS_PASSWORD=SENHA_DO_KEY_VALUE_DO_RENDER
 CACHE_TTL_SECONDS=45
 CACHE_NAMESPACE=cache-aside:students
+CACHE_DIRECT_PATTERNS=students:*,redis:students:*
 DATABASE_URL=postgresql://postgres.PROJECT_REF:SUA_SENHA@HOST_POOLER_SUPABASE:6543/postgres?pgbouncer=true
 DATABASE_SSL=true
 DATABASE_ALLOW_JSON_FALLBACK=false

@@ -10,6 +10,10 @@ import {
 const DEFAULT_TTL_SECONDS = Number(process.env.CACHE_TTL_SECONDS) || 45;
 const DEFAULT_TTL_MS = DEFAULT_TTL_SECONDS * 1000;
 const CACHE_NAMESPACE = process.env.CACHE_NAMESPACE || 'cache-aside:api';
+const DIRECT_CACHE_PATTERNS = (process.env.CACHE_DIRECT_PATTERNS || 'students:*,redis:students:*')
+  .split(',')
+  .map((pattern) => pattern.trim())
+  .filter(Boolean);
 const REDIS_URL = process.env.REDIS_URL;
 const REDIS_USERNAME = process.env.REDIS_USERNAME;
 const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
@@ -29,6 +33,28 @@ function clone(value) {
 
 function cacheKey(key) {
   return `${CACHE_NAMESPACE}:${key}`;
+}
+
+function redisKeyCandidates(key) {
+  return [...new Set([cacheKey(key), key, `redis:${key}`])];
+}
+
+function logicalCacheKey(key) {
+  const namespacePrefix = `${CACHE_NAMESPACE}:`;
+  return key.startsWith(namespacePrefix) ? key.slice(namespacePrefix.length) : key;
+}
+
+function cacheKeyPriority(key) {
+  return key.startsWith(`${CACHE_NAMESPACE}:`) ? 0 : 1;
+}
+
+async function findRedisCacheKeys(client) {
+  const patterns = [
+    `${CACHE_NAMESPACE}:*`,
+    ...DIRECT_CACHE_PATTERNS
+  ];
+  const groups = await Promise.all(patterns.map((pattern) => client.keys(pattern)));
+  return [...new Set(groups.flat())];
 }
 
 function publicRedisHost() {
@@ -159,15 +185,25 @@ export async function getCacheState() {
   }
 
   try {
-    const keys = await client.keys(`${CACHE_NAMESPACE}:*`);
-    const entries = await Promise.all(keys.map(async (key) => {
+    const keys = await findRedisCacheKeys(client);
+    const keysByLogicalName = new Map();
+
+    for (const key of keys.sort((current, next) => cacheKeyPriority(current) - cacheKeyPriority(next))) {
+      const logicalKey = logicalCacheKey(key);
+      if (!keysByLogicalName.has(logicalKey)) {
+        keysByLogicalName.set(logicalKey, key);
+      }
+    }
+
+    const entries = await Promise.all([...keysByLogicalName.entries()].map(async ([logicalKey, redisKey]) => {
       const [value, ttlMs] = await Promise.all([
-        client.get(key),
-        client.pTTL(key)
+        client.get(redisKey),
+        client.pTTL(redisKey)
       ]);
 
       return {
-        key: key.replace(`${CACHE_NAMESPACE}:`, ''),
+        key: logicalKey,
+        redisKey,
         value: parseCachedValue(value),
         ttlMs: ttlMs > 0 ? ttlMs : null
       };
@@ -232,23 +268,27 @@ function readMemory(key, loader, label) {
 }
 
 async function readRedis(client, key, loader, label) {
-  const fullKey = cacheKey(key);
-  const cached = await client.get(fullKey);
+  const candidates = redisKeyCandidates(key);
 
-  if (cached) {
-    recordCacheHit(label);
-    return {
-      data: JSON.parse(cached),
-      source: 'cache',
-      cacheBackend: 'redis',
-      cacheKey: key,
-      cacheEnabled: true
-    };
+  for (const redisKey of candidates) {
+    const cached = await client.get(redisKey);
+
+    if (cached) {
+      recordCacheHit(label);
+      return {
+        data: parseCachedValue(cached),
+        source: 'cache',
+        cacheBackend: 'redis',
+        cacheKey: key,
+        physicalCacheKey: redisKey,
+        cacheEnabled: true
+      };
+    }
   }
 
   recordCacheMiss(label);
   const data = await loader();
-  await client.set(fullKey, JSON.stringify(data), {
+  await client.set(cacheKey(key), JSON.stringify(data), {
     EX: DEFAULT_TTL_SECONDS
   });
 
@@ -266,10 +306,10 @@ export async function clearCache(reason = 'limpeza manual') {
 
   if (client) {
     try {
-      const keys = await client.keys(`${CACHE_NAMESPACE}:*`);
+      const keys = await findRedisCacheKeys(client);
       if (keys.length) {
         await client.del(keys);
-        recordInvalidation(keys.map((key) => key.replace(`${CACHE_NAMESPACE}:`, '')), reason);
+        recordInvalidation(keys.map(logicalCacheKey), reason);
       } else {
         addEvent('cache-clear', 'Redis limpo sem chaves armazenadas', { reason });
       }
@@ -303,7 +343,7 @@ export async function invalidateKeys(keys, reason = 'escrita') {
 
   if (client) {
     try {
-      const fullKeys = keys.map(cacheKey);
+      const fullKeys = [...new Set(keys.flatMap(redisKeyCandidates))];
       const deleted = await client.del(fullKeys);
       if (deleted) {
         recordInvalidation(keys, reason);
