@@ -5,6 +5,7 @@ import {
   Maximize2,
   Minimize2,
   Play,
+  RefreshCw,
   Trash2
 } from 'lucide-react';
 import { apiFetch, CACHE_UPDATED_EVENT } from './api.js';
@@ -77,6 +78,27 @@ function formatCacheValue(value) {
   return JSON.stringify(value, null, 2);
 }
 
+function normalizeCacheState(cacheState, timestamp = Date.now()) {
+  return {
+    ...cacheState,
+    entries: (cacheState?.entries ?? []).map((entry) => {
+      const ttlMs = Number(entry.ttlMs);
+      const expiresAt = Number(entry.expiresAt) || (ttlMs > 0 ? timestamp + ttlMs : null);
+
+      return {
+        ...entry,
+        ttlMs: Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : null,
+        expiresAt
+      };
+    })
+  };
+}
+
+function cacheEntryRemainingMs(entry, timestamp) {
+  if (!entry.expiresAt) return null;
+  return Math.max(0, entry.expiresAt - timestamp);
+}
+
 function BenchmarkSearchCards({ groups }) {
   return (
     <div className="benchmark-search-list">
@@ -125,6 +147,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
   const [cacheLoading, setCacheLoading] = useState(false);
+  const [cacheRefreshing, setCacheRefreshing] = useState(false);
+  const [cacheNow, setCacheNow] = useState(() => Date.now());
   const [n8nFullscreen, setN8nFullscreen] = useState(false);
   const [error, setError] = useState('');
 
@@ -139,8 +163,10 @@ function App() {
       apiFetch('/metrics', { syncCache: false }),
       apiFetch('/cache', { syncCache: false })
     ]);
+    const timestamp = Date.now();
     setMetrics(metricsPayload.data);
-    setCache(cachePayload.data);
+    setCacheNow(timestamp);
+    setCache(normalizeCacheState(cachePayload.data, timestamp));
   }
 
   async function loadStudents() {
@@ -161,7 +187,9 @@ function App() {
 
   useEffect(() => {
     function updateCacheFromRequest(event) {
-      setCache(event.detail);
+      const timestamp = Date.now();
+      setCache(normalizeCacheState(event.detail, timestamp));
+      setCacheNow(timestamp);
     }
 
     window.addEventListener(CACHE_UPDATED_EVENT, updateCacheFromRequest);
@@ -171,6 +199,33 @@ function App() {
       window.removeEventListener(CACHE_UPDATED_EVENT, updateCacheFromRequest);
     };
   }, []);
+
+  useEffect(() => {
+    const hasRunningTtl = (cache.entries ?? []).some((entry) => entry.expiresAt);
+    if (!hasRunningTtl) return undefined;
+
+    const timer = window.setInterval(() => {
+      const timestamp = Date.now();
+      setCacheNow(timestamp);
+      setCache((current) => {
+        const entries = current.entries ?? [];
+        const activeEntries = entries.filter((entry) => !entry.expiresAt || entry.expiresAt > timestamp);
+
+        if (activeEntries.length === entries.length) return current;
+
+        return {
+          ...current,
+          entries: activeEntries,
+          keys: activeEntries.map((entry) => entry.key),
+          size: activeEntries.length
+        };
+      });
+    }, 500);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [cache.entries]);
 
   useEffect(() => {
     if (!n8nFullscreen) return undefined;
@@ -217,13 +272,31 @@ function App() {
     await executeBenchmark(iterations);
   }
 
+  async function refreshCurrentCache() {
+    setCacheRefreshing(true);
+    setError('');
+
+    try {
+      const payload = await apiFetch('/cache', { syncCache: false });
+      const timestamp = Date.now();
+      setCacheNow(timestamp);
+      setCache(normalizeCacheState(payload.data, timestamp));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCacheRefreshing(false);
+    }
+  }
+
   async function clearCurrentCache() {
     setCacheLoading(true);
 
     try {
       await handleAction(async () => {
         const payload = await apiFetch('/cache/clear', { method: 'POST' });
-        setCache(payload.data);
+        const timestamp = Date.now();
+        setCacheNow(timestamp);
+        setCache(normalizeCacheState(payload.data, timestamp));
       });
     } finally {
       setCacheLoading(false);
@@ -249,13 +322,20 @@ function App() {
   const withoutCacheTotalMs = benchmarkTotalMs(benchmark?.withoutCache);
   const withCacheTotalMs = benchmarkTotalMs(benchmark?.withCache);
   const totalImprovementMs = withoutCacheTotalMs - withCacheTotalMs;
-  const cacheEntries = cache.entries?.length
+  const rawCacheEntries = cache.entries?.length
     ? cache.entries
     : (cache.keys ?? []).map((key) => ({
         key,
         value: undefined,
         ttlMs: null
       }));
+  const cacheEntries = rawCacheEntries
+    .map((entry) => ({
+      ...entry,
+      remainingTtlMs: cacheEntryRemainingMs(entry, cacheNow)
+    }))
+    .filter((entry) => entry.remainingTtlMs === null || entry.remainingTtlMs > 0);
+  const visibleCacheSize = cacheEntries.length;
   const cacheBackendLabel = cache.backend === 'redis' ? 'Redis' : 'Memoria';
   return (
     <div className="app-shell">
@@ -448,16 +528,28 @@ function App() {
               <span className="eyebrow">Cache</span>
               <h2>Dados atuais em cache</h2>
             </div>
-            <button
-              className="primary-button"
-              type="button"
-              onClick={clearCurrentCache}
-              disabled={loading || cache.size === 0}
-              title="Limpar todas as chaves do cache"
-            >
-              <Trash2 size={18} />
-              {cacheLoading ? 'Limpando...' : 'Limpar cache'}
-            </button>
+            <div className="cache-panel-actions">
+              <button
+                className={`secondary-button refresh-cache-button ${cacheRefreshing ? 'is-refreshing' : ''}`}
+                type="button"
+                onClick={refreshCurrentCache}
+                disabled={cacheRefreshing || cacheLoading}
+                title="Buscar os dados atuais do cache"
+              >
+                <RefreshCw size={18} />
+                {cacheRefreshing ? 'Atualizando...' : 'Atualizar'}
+              </button>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={clearCurrentCache}
+                disabled={loading || cacheLoading || cacheRefreshing || visibleCacheSize === 0}
+                title="Limpar todas as chaves do cache"
+              >
+                <Trash2 size={18} />
+                {cacheLoading ? 'Limpando...' : 'Limpar cache'}
+              </button>
+            </div>
           </div>
 
           <div className="cache-overview">
@@ -467,7 +559,7 @@ function App() {
             </div>
             <div>
               <span>Chaves</span>
-              <strong>{cache.size}</strong>
+              <strong>{visibleCacheSize}</strong>
             </div>
             <div>
               <span>TTL padrao</span>
@@ -480,7 +572,7 @@ function App() {
               {cacheEntries.map((entry) => (
                 <article className="cache-entry" key={entry.key}>
                   <header>
-                    <span>Expira em {entry.ttlMs ? formatMs(entry.ttlMs) : '-'}</span>
+                    <span>Expira em {entry.remainingTtlMs ? formatMs(entry.remainingTtlMs) : '-'}</span>
                   </header>
                   <div className="cache-entry-field">
                     <span>Key</span>

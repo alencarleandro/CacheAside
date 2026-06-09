@@ -12,3 +12,7 @@ export function badRequest(message) {
 export function notFound(message) {
   return new HttpError(404, message);
 }
+
+export function serviceUnavailable(message) {
+  return new HttpError(503, message);
+}

@@ -233,6 +233,12 @@ h2 {
   }
 }
 
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .section-heading {
   min-height: 48px;
   display: flex;
@@ -427,6 +433,27 @@ h2 {
 .primary-button:hover:not(:disabled) {
   border-color: var(--redis-dark);
   background: var(--redis-dark);
+}
+
+.secondary-button {
+  border-color: #e3c4bf;
+  background: #fffafa;
+  color: var(--redis-dark);
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--redis);
+  background: var(--redis-soft);
+}
+
+.refresh-cache-button.is-refreshing {
+  border-color: var(--redis);
+  background: var(--redis-soft);
+  color: var(--redis-dark);
+}
+
+.refresh-cache-button.is-refreshing svg {
+  animation: refresh-spin 720ms linear infinite;
 }
 
 .comparison-bars {
@@ -750,6 +777,17 @@ h2 {
   position: relative;
 }
 
+.cache-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cache-panel-actions button {
+  min-width: 136px;
+}
+
 .cache-overview {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -868,9 +906,16 @@ h2 {
   text-align: center;
 }
 
-.cache-panel .primary-button:disabled {
+.cache-panel .primary-button:disabled,
+.cache-panel .secondary-button:disabled {
   border-color: var(--line);
   background: #f2e9e7;
+}
+
+.cache-panel .refresh-cache-button.is-refreshing:disabled {
+  border-color: var(--redis);
+  background: var(--redis-soft);
+  color: var(--redis-dark);
 }
 
 @keyframes table-area-in {
@@ -1010,6 +1055,15 @@ h2 {
   .inline-controls input,
   .inline-controls button {
     width: 100%;
+  }
+
+  .cache-panel-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .cache-panel-actions button {
+    flex: 1 1 150px;
   }
 
   .module-note,

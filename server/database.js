@@ -4,12 +4,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { addEvent, recordDbRead, recordDbWrite } from './metrics.js';
-import { notFound } from './errors.js';
+import { notFound, serviceUnavailable } from './errors.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = path.join(__dirname, 'data', 'students.json');
 const DATABASE_URL = process.env.DATABASE_URL;
 const DATABASE_SSL = process.env.DATABASE_SSL !== 'false';
+const ALLOW_JSON_FALLBACK = !DATABASE_URL || process.env.DATABASE_ALLOW_JSON_FALLBACK === 'true';
 const POSTGRES_RETRY_INTERVAL_MS = 10_000;
 
 let state = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
@@ -35,6 +36,19 @@ function databaseHost() {
   } catch {
     return 'configurado';
   }
+}
+
+function ensureLocalFallback() {
+  if (ALLOW_JSON_FALLBACK) return;
+
+  throw serviceUnavailable(
+    'Supabase/Postgres indisponivel. Ajuste DATABASE_URL para a connection string pooler do Supabase ou habilite DATABASE_ALLOW_JSON_FALLBACK=true para usar JSON local.'
+  );
+}
+
+function runLocalFallback(operation) {
+  ensureLocalFallback();
+  return operation();
 }
 
 function studentFromRow(row) {
@@ -134,10 +148,16 @@ async function getPostgresPool() {
     .catch((error) => {
       postgresReady = false;
       lastPostgresError = error.message;
-      addEvent('database-error', 'Postgres indisponivel; usando JSON local', {
-        host: databaseHost(),
-        message: error.message
-      });
+      addEvent(
+        'database-error',
+        ALLOW_JSON_FALLBACK
+          ? 'Postgres indisponivel; usando JSON local'
+          : 'Postgres indisponivel; fallback JSON bloqueado',
+        {
+          host: databaseHost(),
+          message: error.message
+        }
+      );
       return null;
     })
     .finally(() => {
@@ -149,12 +169,15 @@ async function getPostgresPool() {
 
 export function getDatabaseState() {
   return {
-    backend: postgresReady ? 'postgres' : 'json',
+    backend: postgresReady ? 'postgres' : (ALLOW_JSON_FALLBACK ? 'json' : 'unavailable'),
     postgres: {
       configured: Boolean(DATABASE_URL),
       connected: postgresReady,
       host: databaseHost(),
       lastError: lastPostgresError
+    },
+    fallback: {
+      jsonEnabled: ALLOW_JSON_FALLBACK
     }
   };
 }
@@ -252,7 +275,7 @@ async function removeLocalStudent(id) {
 export async function peekFirstStudentId() {
   const postgres = await getPostgresPool();
 
-  if (!postgres) return peekLocalFirstStudentId();
+  if (!postgres) return runLocalFallback(peekLocalFirstStudentId);
 
   const result = await postgres.query('select id from students order by id limit 1');
   return result.rows[0]?.id ?? null;
@@ -261,7 +284,7 @@ export async function peekFirstStudentId() {
 export async function findAllStudents() {
   const postgres = await getPostgresPool();
 
-  if (!postgres) return findLocalAllStudents();
+  if (!postgres) return runLocalFallback(findLocalAllStudents);
 
   recordDbRead('listar alunos no Postgres');
   const result = await postgres.query(`
@@ -276,7 +299,7 @@ export async function findAllStudents() {
 export async function findStudentById(id) {
   const postgres = await getPostgresPool();
 
-  if (!postgres) return findLocalStudentById(id);
+  if (!postgres) return runLocalFallback(() => findLocalStudentById(id));
 
   recordDbRead(`aluno ${id} no Postgres`);
   const result = await postgres.query(
@@ -293,7 +316,7 @@ export async function findStudentById(id) {
 export async function createStudent(student) {
   const postgres = await getPostgresPool();
 
-  if (!postgres) return createLocalStudent(student);
+  if (!postgres) return runLocalFallback(() => createLocalStudent(student));
 
   recordDbWrite('cadastrar aluno no Postgres');
   const result = await postgres.query(
@@ -309,7 +332,7 @@ export async function createStudent(student) {
 export async function replaceStudent(id, student) {
   const postgres = await getPostgresPool();
 
-  if (!postgres) return replaceLocalStudent(id, student);
+  if (!postgres) return runLocalFallback(() => replaceLocalStudent(id, student));
 
   recordDbWrite(`substituir aluno ${id} no Postgres`);
   const result = await postgres.query(
@@ -332,7 +355,7 @@ export async function replaceStudent(id, student) {
 export async function patchStudent(id, patch) {
   const postgres = await getPostgresPool();
 
-  if (!postgres) return patchLocalStudent(id, patch);
+  if (!postgres) return runLocalFallback(() => patchLocalStudent(id, patch));
 
   const fieldMap = {
     name: 'name',
@@ -367,7 +390,7 @@ export async function patchStudent(id, patch) {
 export async function removeStudent(id) {
   const postgres = await getPostgresPool();
 
-  if (!postgres) return removeLocalStudent(id);
+  if (!postgres) return runLocalFallback(() => removeLocalStudent(id));
 
   recordDbWrite(`remover aluno ${id} no Postgres`);
   const result = await postgres.query(
