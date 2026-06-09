@@ -66,6 +66,20 @@ app.get('/api/health', asyncRoute(async () => ({
   }
 })));
 
+app.get('/api/render-ping', (request, response) => {
+  const loggedAt = new Date().toISOString();
+
+  console.log(`[render-ping] ${loggedAt} ${request.method} ${request.originalUrl} ip=${request.ip}`);
+
+  response.json({
+    data: {
+      status: 'ok',
+      message: 'Ping registrado nos logs da API.',
+      loggedAt
+    }
+  });
+});
+
 app.get('/api/students', asyncRoute(async () => {
   const result = await getStudents();
   return {
