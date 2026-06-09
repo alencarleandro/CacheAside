@@ -12,7 +12,7 @@ import { apiFetch, CACHE_UPDATED_EVENT } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
 
 const INITIAL_BENCHMARK_REPETITIONS = 1;
-const N8N_WORKFLOW_URL = 'https://n8n-kupm.onrender.com/workflow/W2MPm1fzBxBnbjHo?new=true';
+const N8N_WORKFLOW_URL = 'https://n8n-kupm.onrender.com/workflow/FkPxNsosR7w6MQww';
 
 function formatMs(value) {
   const milliseconds = Number(value || 0);
