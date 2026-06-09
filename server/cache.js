@@ -27,6 +27,13 @@ let redisConnectionPromise = null;
 let lastRedisError = null;
 let lastRedisAttemptAt = 0;
 
+class RedisAccessError extends Error {
+  constructor(error) {
+    super(error.message);
+    this.cause = error;
+  }
+}
+
 function clone(value) {
   return structuredClone(value);
 }
@@ -270,27 +277,40 @@ function readMemory(key, loader, label) {
 async function readRedis(client, key, loader, label) {
   const candidates = redisKeyCandidates(key);
 
-  for (const redisKey of candidates) {
-    const cached = await client.get(redisKey);
+  try {
+    for (const redisKey of candidates) {
+      const cached = await client.get(redisKey);
 
-    if (cached) {
-      recordCacheHit(label);
-      return {
-        data: parseCachedValue(cached),
-        source: 'cache',
-        cacheBackend: 'redis',
-        cacheKey: key,
-        physicalCacheKey: redisKey,
-        cacheEnabled: true
-      };
+      if (cached) {
+        recordCacheHit(label);
+        return {
+          data: parseCachedValue(cached),
+          source: 'cache',
+          cacheBackend: 'redis',
+          cacheKey: key,
+          physicalCacheKey: redisKey,
+          cacheEnabled: true
+        };
+      }
     }
+  } catch (error) {
+    throw new RedisAccessError(error);
   }
 
   recordCacheMiss(label);
   const data = await loader();
-  await client.set(cacheKey(key), JSON.stringify(data), {
-    EX: DEFAULT_TTL_SECONDS
-  });
+
+  try {
+    await client.set(cacheKey(key), JSON.stringify(data), {
+      EX: DEFAULT_TTL_SECONDS
+    });
+  } catch (error) {
+    redisReady = false;
+    lastRedisError = error.message;
+    addEvent('redis-error', 'Falha ao gravar no Redis; resposta veio do banco sem cachear', {
+      message: error.message
+    });
+  }
 
   return {
     data,
@@ -391,6 +411,10 @@ export async function readThroughCache(key, loader, options = {}) {
   try {
     return await readRedis(client, key, loader, label);
   } catch (error) {
+    if (!(error instanceof RedisAccessError)) {
+      throw error;
+    }
+
     redisReady = false;
     lastRedisError = error.message;
     addEvent('redis-error', 'Falha ao acessar Redis; usando cache em memoria', {
