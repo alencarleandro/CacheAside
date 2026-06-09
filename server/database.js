@@ -58,7 +58,15 @@ function studentFromRow(row) {
     email: row.email,
     course: row.course,
     period: Number(row.period),
-    gradeAverage: Number(row.grade_average)
+    gradeAverage: Number(row.grade_average),
+    cacheEnabled: row.cache_enabled !== false
+  };
+}
+
+function studentFromState(student) {
+  return {
+    ...clone(student),
+    cacheEnabled: student.cacheEnabled !== false
   };
 }
 
@@ -91,10 +99,18 @@ async function seedPostgres(client) {
 
   for (const student of state.students) {
     await client.query(
-      `insert into students (id, name, email, course, period, grade_average)
-       values ($1, $2, $3, $4, $5, $6)
+      `insert into students (id, name, email, course, period, grade_average, cache_enabled)
+       values ($1, $2, $3, $4, $5, $6, $7)
        on conflict (id) do nothing`,
-      [student.id, student.name, student.email, student.course, student.period, student.gradeAverage]
+      [
+        student.id,
+        student.name,
+        student.email,
+        student.course,
+        student.period,
+        student.gradeAverage,
+        student.cacheEnabled !== false
+      ]
     );
   }
 
@@ -115,9 +131,15 @@ async function initializePostgres(client) {
       course text not null,
       period integer not null check (period between 1 and 12),
       grade_average numeric(3, 1) not null check (grade_average between 0 and 10),
+      cache_enabled boolean not null default true,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     )
+  `);
+
+  await client.query(`
+    alter table students
+    add column if not exists cache_enabled boolean not null default true
   `);
 
   await seedPostgres(client);
@@ -189,7 +211,7 @@ function peekLocalFirstStudentId() {
 async function findLocalAllStudents() {
   recordDbRead('listar alunos');
   await simulateDatabaseLatency('read');
-  return clone(state.students);
+  return state.students.map(studentFromState);
 }
 
 async function findLocalStudentById(id) {
@@ -197,7 +219,7 @@ async function findLocalStudentById(id) {
   await simulateDatabaseLatency('read');
   const student = state.students.find((item) => item.id === id);
   if (!student) throw notFound('Aluno nao encontrado.');
-  return clone(student);
+  return studentFromState(student);
 }
 
 async function createLocalStudent(student) {
@@ -206,7 +228,8 @@ async function createLocalStudent(student) {
 
   const created = {
     ...student,
-    id: state.nextId
+    id: state.nextId,
+    cacheEnabled: student.cacheEnabled !== false
   };
 
   state = {
@@ -215,7 +238,7 @@ async function createLocalStudent(student) {
   };
 
   persist();
-  return clone(created);
+  return studentFromState(created);
 }
 
 async function replaceLocalStudent(id, student) {
@@ -227,14 +250,14 @@ async function replaceLocalStudent(id, student) {
     ...state,
     students: state.students.map((item) => {
       if (item.id !== id) return item;
-      updated = { ...student, id };
+      updated = { ...student, id, cacheEnabled: student.cacheEnabled !== false };
       return updated;
     })
   };
 
   if (!updated) throw notFound('Aluno nao encontrado.');
   persist();
-  return clone(updated);
+  return studentFromState(updated);
 }
 
 async function patchLocalStudent(id, patch) {
@@ -253,7 +276,7 @@ async function patchLocalStudent(id, patch) {
 
   if (!updated) throw notFound('Aluno nao encontrado.');
   persist();
-  return clone(updated);
+  return studentFromState(updated);
 }
 
 async function removeLocalStudent(id) {
@@ -269,7 +292,7 @@ async function removeLocalStudent(id) {
   };
 
   persist();
-  return clone(student);
+  return studentFromState(student);
 }
 
 export async function peekFirstStudentId() {
@@ -288,7 +311,7 @@ export async function findAllStudents() {
 
   recordDbRead('listar alunos no Postgres');
   const result = await postgres.query(`
-    select id, name, email, course, period, grade_average
+    select id, name, email, course, period, grade_average, cache_enabled
     from students
     order by id
   `);
@@ -303,7 +326,7 @@ export async function findStudentById(id) {
 
   recordDbRead(`aluno ${id} no Postgres`);
   const result = await postgres.query(
-    `select id, name, email, course, period, grade_average
+    `select id, name, email, course, period, grade_average, cache_enabled
      from students
      where id = $1`,
     [id]
@@ -320,10 +343,10 @@ export async function createStudent(student) {
 
   recordDbWrite('cadastrar aluno no Postgres');
   const result = await postgres.query(
-    `insert into students (name, email, course, period, grade_average)
-     values ($1, $2, $3, $4, $5)
-     returning id, name, email, course, period, grade_average`,
-    [student.name, student.email, student.course, student.period, student.gradeAverage]
+    `insert into students (name, email, course, period, grade_average, cache_enabled)
+     values ($1, $2, $3, $4, $5, $6)
+     returning id, name, email, course, period, grade_average, cache_enabled`,
+    [student.name, student.email, student.course, student.period, student.gradeAverage, student.cacheEnabled !== false]
   );
 
   return studentFromRow(result.rows[0]);
@@ -342,10 +365,11 @@ export async function replaceStudent(id, student) {
          course = $4,
          period = $5,
          grade_average = $6,
+         cache_enabled = $7,
          updated_at = now()
      where id = $1
-     returning id, name, email, course, period, grade_average`,
-    [id, student.name, student.email, student.course, student.period, student.gradeAverage]
+     returning id, name, email, course, period, grade_average, cache_enabled`,
+    [id, student.name, student.email, student.course, student.period, student.gradeAverage, student.cacheEnabled !== false]
   );
 
   if (!result.rows.length) throw notFound('Aluno nao encontrado.');
@@ -362,7 +386,8 @@ export async function patchStudent(id, patch) {
     email: 'email',
     course: 'course',
     period: 'period',
-    gradeAverage: 'grade_average'
+    gradeAverage: 'grade_average',
+    cacheEnabled: 'cache_enabled'
   };
   const values = [id];
   const assignments = [];
@@ -379,7 +404,7 @@ export async function patchStudent(id, patch) {
     `update students
      set ${assignments.join(', ')}, updated_at = now()
      where id = $1
-     returning id, name, email, course, period, grade_average`,
+     returning id, name, email, course, period, grade_average, cache_enabled`,
     values
   );
 
@@ -396,7 +421,7 @@ export async function removeStudent(id) {
   const result = await postgres.query(
     `delete from students
      where id = $1
-     returning id, name, email, course, period, grade_average`,
+     returning id, name, email, course, period, grade_average, cache_enabled`,
     [id]
   );
 

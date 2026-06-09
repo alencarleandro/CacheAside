@@ -22,6 +22,17 @@ function toNumber(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function toBoolean(value, fallback = true) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+
+  const normalized = String(value).trim().toLowerCase();
+  if (['false', '0', 'nao', 'não', 'off', 'inativo'].includes(normalized)) return false;
+  if (['true', '1', 'sim', 'on', 'ativo'].includes(normalized)) return true;
+  return fallback;
+}
+
 function normalizeStudent(payload, partial = false) {
   const normalized = {};
 
@@ -43,6 +54,10 @@ function normalizeStudent(payload, partial = false) {
 
   if (!partial || payload.gradeAverage !== undefined) {
     normalized.gradeAverage = Math.max(0, Math.min(10, toNumber(payload.gradeAverage, 0)));
+  }
+
+  if (!partial || payload.cacheEnabled !== undefined) {
+    normalized.cacheEnabled = toBoolean(payload.cacheEnabled, true);
   }
 
   if (!partial) {
@@ -84,7 +99,9 @@ export async function getStudents() {
 export async function getStudent(rawId) {
   const id = parseId(rawId);
   return readThroughCache(studentKey(id), () => findStudentById(id), {
-    label: `aluno ${id}`
+    label: `aluno ${id}`,
+    shouldCache: (student) => student.cacheEnabled !== false,
+    skipReason: 'cache desativado para este aluno'
   });
 }
 

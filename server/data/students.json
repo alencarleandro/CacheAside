@@ -7,7 +7,8 @@
       "email": "ana.souza@pucminas.br",
       "course": "Engenharia de Software",
       "period": 5,
-      "gradeAverage": 8.7
+      "gradeAverage": 8.7,
+      "cacheEnabled": true
     },
     {
       "id": 2,
@@ -15,7 +16,8 @@
       "email": "bruno.lima@pucminas.br",
       "course": "Sistemas de Informacao",
       "period": 6,
-      "gradeAverage": 7.9
+      "gradeAverage": 7.9,
+      "cacheEnabled": true
     },
     {
       "id": 3,
@@ -23,7 +25,8 @@
       "email": "carla.mendes@pucminas.br",
       "course": "Ciencia da Computacao",
       "period": 4,
-      "gradeAverage": 9.1
+      "gradeAverage": 9.1,
+      "cacheEnabled": true
     },
     {
       "id": 4,
@@ -31,7 +34,8 @@
       "email": "diego.rocha@pucminas.br",
       "course": "Engenharia de Software",
       "period": 7,
-      "gradeAverage": 8.2
+      "gradeAverage": 8.2,
+      "cacheEnabled": true
     },
     {
       "id": 5,
@@ -39,7 +43,8 @@
       "email": "fernanda.alves@pucminas.br",
       "course": "Sistemas de Informacao",
       "period": 3,
-      "gradeAverage": 8.9
+      "gradeAverage": 8.9,
+      "cacheEnabled": true
     },
     {
       "id": 6,
@@ -47,7 +52,8 @@
       "email": "gabriel.nunes@pucminas.br",
       "course": "Engenharia de Computacao",
       "period": 8,
-      "gradeAverage": 7.6
+      "gradeAverage": 7.6,
+      "cacheEnabled": true
     }
   ]
 }

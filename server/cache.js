@@ -241,7 +241,20 @@ export async function getCacheState() {
   }
 }
 
-function readMemory(key, loader, label) {
+function skipStoreResult(data, key, backend, reason) {
+  addEvent('cache-skip', `Cache ignorado para ${key}`, { reason });
+
+  return {
+    data,
+    source: 'database',
+    cacheBackend: backend,
+    cacheKey: key,
+    cacheEnabled: false,
+    cacheSkipped: true
+  };
+}
+
+function readMemory(key, loader, label, options = {}) {
   const cached = memoryStore.get(key);
 
   if (cached && cached.expiresAt > now()) {
@@ -259,6 +272,10 @@ function readMemory(key, loader, label) {
   recordCacheMiss(label);
 
   return loader().then((data) => {
+    if (options.shouldCache && !options.shouldCache(data)) {
+      return skipStoreResult(data, key, 'disabled', options.skipReason ?? 'registro nao cacheavel');
+    }
+
     memoryStore.set(key, {
       value: clone(data),
       expiresAt: now() + DEFAULT_TTL_MS
@@ -274,7 +291,7 @@ function readMemory(key, loader, label) {
   });
 }
 
-async function readRedis(client, key, loader, label) {
+async function readRedis(client, key, loader, label, options = {}) {
   const candidates = redisKeyCandidates(key);
 
   try {
@@ -299,6 +316,10 @@ async function readRedis(client, key, loader, label) {
 
   recordCacheMiss(label);
   const data = await loader();
+
+  if (options.shouldCache && !options.shouldCache(data)) {
+    return skipStoreResult(data, key, 'disabled', options.skipReason ?? 'registro nao cacheavel');
+  }
 
   try {
     await client.set(cacheKey(key), JSON.stringify(data), {
@@ -406,10 +427,10 @@ export async function readThroughCache(key, loader, options = {}) {
 
   const client = await getRedisClient();
 
-  if (!client) return readMemory(key, loader, label);
+  if (!client) return readMemory(key, loader, label, options);
 
   try {
-    return await readRedis(client, key, loader, label);
+    return await readRedis(client, key, loader, label, options);
   } catch (error) {
     if (!(error instanceof RedisAccessError)) {
       throw error;
@@ -420,6 +441,6 @@ export async function readThroughCache(key, loader, options = {}) {
     addEvent('redis-error', 'Falha ao acessar Redis; usando cache em memoria', {
       message: error.message
     });
-    return readMemory(key, loader, label);
+    return readMemory(key, loader, label, options);
   }
 }

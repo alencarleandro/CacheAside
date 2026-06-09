@@ -1,18 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
+  LayoutDashboard,
   Maximize2,
   Minimize2,
+  Pencil,
   Play,
+  Plus,
   RefreshCw,
-  Trash2
+  Save,
+  Table2,
+  Trash2,
+  X
 } from 'lucide-react';
 import { apiFetch, CACHE_UPDATED_EVENT } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
 
 const INITIAL_BENCHMARK_REPETITIONS = 1;
 const N8N_WORKFLOW_URL = 'https://n8n-kupm.onrender.com/workflow/FkPxNsosR7w6MQww';
+const PAGE_LAB = 'telaLaboratorio';
+const PAGE_CRUD = 'crud';
+const EMPTY_STUDENT_FORM = {
+  name: '',
+  email: '',
+  course: '',
+  period: '1',
+  gradeAverage: '0',
+  cacheEnabled: true
+};
 
 function formatMs(value) {
   const milliseconds = Number(value || 0);
@@ -78,6 +94,28 @@ function formatCacheValue(value) {
   return JSON.stringify(value, null, 2);
 }
 
+function studentToForm(student) {
+  return {
+    name: student.name ?? '',
+    email: student.email ?? '',
+    course: student.course ?? '',
+    period: String(student.period ?? 1),
+    gradeAverage: String(student.gradeAverage ?? 0),
+    cacheEnabled: student.cacheEnabled !== false
+  };
+}
+
+function studentPayloadFromForm(form) {
+  return {
+    name: form.name.trim(),
+    email: form.email.trim(),
+    course: form.course.trim(),
+    period: Number(form.period),
+    gradeAverage: Number(form.gradeAverage),
+    cacheEnabled: form.cacheEnabled !== false
+  };
+}
+
 function normalizeCacheState(cacheState, timestamp = Date.now()) {
   return {
     ...cacheState,
@@ -136,6 +174,9 @@ function FocusNote({ measure, result }) {
 }
 
 function App() {
+  const shellRef = useRef(null);
+  const n8nPanelRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(PAGE_LAB);
   const [students, setStudents] = useState([]);
   const [metrics, setMetrics] = useState(null);
   const [cache, setCache] = useState({ enabled: true, size: 0, keys: [], entries: [] });
@@ -150,6 +191,13 @@ function App() {
   const [cacheRefreshing, setCacheRefreshing] = useState(false);
   const [cacheNow, setCacheNow] = useState(() => Date.now());
   const [n8nFullscreen, setN8nFullscreen] = useState(false);
+  const [n8nLoaded, setN8nLoaded] = useState(false);
+  const [studentForm, setStudentForm] = useState(EMPTY_STUDENT_FORM);
+  const [editingStudentId, setEditingStudentId] = useState(null);
+  const [crudLoading, setCrudLoading] = useState(false);
+  const [crudSaving, setCrudSaving] = useState(false);
+  const [togglingStudentId, setTogglingStudentId] = useState(null);
+  const [deletingStudentId, setDeletingStudentId] = useState(null);
   const [error, setError] = useState('');
 
   const benchmarkScale = useMemo(() => {
@@ -238,6 +286,57 @@ function App() {
     };
   }, [n8nFullscreen]);
 
+  useEffect(() => {
+    if (currentPage !== PAGE_CRUD) return;
+    loadCrudStudents();
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (currentPage === PAGE_LAB) {
+      setN8nLoaded(false);
+      return;
+    }
+
+    setN8nFullscreen(false);
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (currentPage !== PAGE_LAB) return undefined;
+
+    const shell = shellRef.current;
+    if (!shell) return undefined;
+
+    shell.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+
+    const scrollReset = window.setTimeout(() => {
+      shell.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, 120);
+
+    return () => window.clearTimeout(scrollReset);
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (currentPage !== PAGE_LAB || n8nLoaded) return undefined;
+
+    const root = shellRef.current;
+    const target = n8nPanelRef.current;
+    if (!root || !target || !window.IntersectionObserver) return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setN8nLoaded(true);
+      observer.disconnect();
+    }, {
+      root,
+      rootMargin: '280px 0px',
+      threshold: 0
+    });
+
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [currentPage, n8nLoaded]);
+
   async function handleAction(action) {
     setLoading(true);
     setError('');
@@ -303,6 +402,90 @@ function App() {
     }
   }
 
+  function updateStudentForm(field, value) {
+    setStudentForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  function resetStudentForm() {
+    setEditingStudentId(null);
+    setStudentForm(EMPTY_STUDENT_FORM);
+  }
+
+  function startEditingStudent(student) {
+    setEditingStudentId(student.id);
+    setStudentForm(studentToForm(student));
+  }
+
+  async function loadCrudStudents() {
+    setCrudLoading(true);
+    setError('');
+
+    try {
+      await loadStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCrudLoading(false);
+    }
+  }
+
+  async function saveCrudStudent(event) {
+    event.preventDefault();
+    setCrudSaving(true);
+    setError('');
+
+    try {
+      const payload = studentPayloadFromForm(studentForm);
+      await apiFetch(editingStudentId ? `/students/${editingStudentId}` : '/students', {
+        method: editingStudentId ? 'PATCH' : 'POST',
+        body: payload
+      });
+      resetStudentForm();
+      await loadStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCrudSaving(false);
+    }
+  }
+
+  async function toggleStudentCache(student) {
+    setTogglingStudentId(student.id);
+    setError('');
+
+    try {
+      await apiFetch(`/students/${student.id}`, {
+        method: 'PATCH',
+        body: { cacheEnabled: student.cacheEnabled === false }
+      });
+      await loadStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setTogglingStudentId(null);
+    }
+  }
+
+  async function deleteCrudStudent(student) {
+    if (!window.confirm(`Excluir ${student.name}?`)) return;
+
+    setDeletingStudentId(student.id);
+    setError('');
+
+    try {
+      await apiFetch(`/students/${student.id}`, { method: 'DELETE' });
+      if (editingStudentId === student.id) resetStudentForm();
+      await loadStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingStudentId(null);
+    }
+  }
+
   const benchmarkReads = benchmark?.reads ?? [];
   const withoutCacheReads = benchmarkReads.filter((read) => read.phase === 'sem cache');
   const withCacheReads = benchmarkReads.filter((read) => read.phase === 'com cache');
@@ -337,8 +520,11 @@ function App() {
     .filter((entry) => entry.remainingTtlMs === null || entry.remainingTtlMs > 0);
   const visibleCacheSize = cacheEntries.length;
   const cacheBackendLabel = cache.backend === 'redis' ? 'Redis' : 'Memoria';
+  const isLabPage = currentPage === PAGE_LAB;
+  const isCrudPage = currentPage === PAGE_CRUD;
+
   return (
-    <div className="app-shell">
+    <div className="app-frame">
       <header className="topbar">
         <div className="brand-title">
           <CacheAsideMark className="cache-aside-mark" />
@@ -348,9 +534,36 @@ function App() {
         </div>
       </header>
 
-      {error && <div className="alert">{error}</div>}
+      <aside className="app-sidebar" aria-label="Navegacao principal">
+        <nav className="sidebar-nav">
+          <button
+            className={`sidebar-nav-item ${isLabPage ? 'is-active' : ''}`}
+            type="button"
+            onClick={() => setCurrentPage(PAGE_LAB)}
+            aria-current={isLabPage ? 'page' : undefined}
+            title="Abrir laboratorio"
+          >
+            <LayoutDashboard size={18} />
+            <span>Lab</span>
+          </button>
+          <button
+            className={`sidebar-nav-item ${isCrudPage ? 'is-active' : ''}`}
+            type="button"
+            onClick={() => setCurrentPage(PAGE_CRUD)}
+            aria-current={isCrudPage ? 'page' : undefined}
+            title="Abrir CRUD"
+          >
+            <Table2 size={18} />
+            <span>CRUD</span>
+          </button>
+        </nav>
+      </aside>
 
-      <main className="workspace">
+      <div className="app-shell" ref={shellRef}>
+        {error && <div className="alert">{error}</div>}
+
+        {isLabPage ? (
+      <main className="workspace tela-laboratorio">
         <section className={`surface benchmark-panel ${benchmarkLoading ? 'is-loading' : ''}`} aria-busy={benchmarkLoading}>
           {benchmarkLoading && (
             <div className="benchmark-loading" role="status" aria-live="polite">
@@ -592,7 +805,10 @@ function App() {
           )}
         </section>
 
-        <section className={`surface consistency-panel ${n8nFullscreen ? 'is-n8n-fullscreen' : ''}`}>
+        <section
+          className={`surface consistency-panel ${n8nFullscreen ? 'is-n8n-fullscreen' : ''}`}
+          ref={n8nPanelRef}
+        >
           <div className="section-heading">
             <div>
               <span className="eyebrow">Tradeoff</span>
@@ -601,7 +817,10 @@ function App() {
             <button
               className="primary-button n8n-fullscreen-toggle"
               type="button"
-              onClick={() => setN8nFullscreen((current) => !current)}
+              onClick={() => {
+                setN8nLoaded(true);
+                setN8nFullscreen((current) => !current);
+              }}
               aria-pressed={n8nFullscreen}
               title={n8nFullscreen ? 'Voltar ao tamanho normal' : 'Expandir n8n em tela cheia'}
             >
@@ -610,15 +829,208 @@ function App() {
             </button>
           </div>
           <div className="tradeoff-workflow-shell">
-            <iframe
-              title="Workflow n8n do tradeoff"
-              src={N8N_WORKFLOW_URL}
-            />
+            {n8nLoaded ? (
+              <iframe
+                title="Workflow n8n do tradeoff"
+                src={N8N_WORKFLOW_URL}
+                loading="lazy"
+                tabIndex={-1}
+              />
+            ) : (
+              <div className="tradeoff-workflow-placeholder">
+                <span>Workflow n8n</span>
+              </div>
+            )}
           </div>
         </section>
 
-
       </main>
+        ) : (
+      <main className="workspace tela-crud">
+        <section className="surface crud-panel">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">CRUD</span>
+              <h2>Alunos</h2>
+            </div>
+            <div className="crud-panel-actions">
+              <button
+                className={`secondary-button refresh-cache-button ${crudLoading ? 'is-refreshing' : ''}`}
+                type="button"
+                onClick={loadCrudStudents}
+                disabled={crudLoading || crudSaving}
+                title="Atualizar alunos"
+              >
+                <RefreshCw size={18} />
+                {crudLoading ? 'Atualizando...' : 'Atualizar'}
+              </button>
+            </div>
+          </div>
+
+          <div className="crud-layout">
+            <form className="crud-form" onSubmit={saveCrudStudent}>
+              <div className="crud-form-heading">
+                <span className="eyebrow">Registro</span>
+                <h2>{editingStudentId ? `Aluno ${editingStudentId}` : 'Novo aluno'}</h2>
+              </div>
+
+              <label>
+                Nome
+                <input
+                  value={studentForm.name}
+                  onChange={(event) => updateStudentForm('name', event.target.value)}
+                  required
+                />
+              </label>
+
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={studentForm.email}
+                  onChange={(event) => updateStudentForm('email', event.target.value)}
+                  required
+                />
+              </label>
+
+              <label>
+                Curso
+                <input
+                  value={studentForm.course}
+                  onChange={(event) => updateStudentForm('course', event.target.value)}
+                  required
+                />
+              </label>
+
+              <div className="crud-form-grid">
+                <label>
+                  Periodo
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={studentForm.period}
+                    onChange={(event) => updateStudentForm('period', event.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  CR
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    value={studentForm.gradeAverage}
+                    onChange={(event) => updateStudentForm('gradeAverage', event.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+
+              <button
+                className={`student-cache-toggle ${studentForm.cacheEnabled ? 'is-on' : 'is-off'}`}
+                type="button"
+                role="switch"
+                aria-checked={studentForm.cacheEnabled}
+                onClick={() => updateStudentForm('cacheEnabled', !studentForm.cacheEnabled)}
+                title={studentForm.cacheEnabled ? 'Este aluno pode usar cache' : 'Este aluno força cache miss'}
+              >
+                <span className="switch-track" aria-hidden="true">
+                  <span className="switch-thumb" />
+                </span>
+                <span>
+                  Cache do aluno
+                  <strong>{studentForm.cacheEnabled ? 'Usa cache' : 'Forca miss'}</strong>
+                </span>
+              </button>
+
+              <div className="crud-form-actions">
+                <button className="primary-button" type="submit" disabled={crudSaving}>
+                  {editingStudentId ? <Save size={18} /> : <Plus size={18} />}
+                  {crudSaving ? 'Salvando...' : editingStudentId ? 'Salvar' : 'Criar'}
+                </button>
+                {editingStudentId && (
+                  <button className="secondary-button" type="button" onClick={resetStudentForm} disabled={crudSaving}>
+                    <X size={18} />
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+
+            <div className="crud-table-shell">
+              <div className="crud-table-toolbar">
+                <span>{students.length} registros</span>
+              </div>
+
+              <div className="crud-table" aria-live="polite">
+                <div className="crud-table-row crud-table-head">
+                  <span>ID</span>
+                  <span>Aluno</span>
+                  <span>Curso</span>
+                  <span>Periodo</span>
+                  <span>CR</span>
+                  <span>Cache</span>
+                  <span>Acoes</span>
+                </div>
+
+                {students.length ? (
+                  students.map((student) => (
+                    <div className="crud-table-row" key={student.id}>
+                      <strong>{student.id}</strong>
+                      <div className="crud-student-main">
+                        <strong>{student.name}</strong>
+                        <span>{student.email}</span>
+                      </div>
+                      <span>{student.course}</span>
+                      <span>{student.period}</span>
+                      <strong>{Number(student.gradeAverage).toFixed(1)}</strong>
+                      <button
+                        className={`student-cache-toggle compact ${student.cacheEnabled !== false ? 'is-on' : 'is-off'}`}
+                        type="button"
+                        role="switch"
+                        aria-checked={student.cacheEnabled !== false}
+                        onClick={() => toggleStudentCache(student)}
+                        disabled={togglingStudentId === student.id}
+                        title={student.cacheEnabled !== false ? 'Desativar cache deste aluno' : 'Ativar cache deste aluno'}
+                      >
+                        <span className="switch-track" aria-hidden="true">
+                          <span className="switch-thumb" />
+                        </span>
+                        <span>{student.cacheEnabled !== false ? 'Ativo' : 'Miss'}</span>
+                      </button>
+                      <div className="crud-row-actions">
+                        <button
+                          className="secondary-button icon-button"
+                          type="button"
+                          onClick={() => startEditingStudent(student)}
+                          title="Editar aluno"
+                        >
+                          <Pencil size={17} />
+                        </button>
+                        <button
+                          className="primary-button icon-button danger-button"
+                          type="button"
+                          onClick={() => deleteCrudStudent(student)}
+                          disabled={deletingStudentId === student.id}
+                          title="Excluir aluno"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="crud-empty-state">Nenhum aluno encontrado.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+        )}
+      </div>
     </div>
   );
 }
