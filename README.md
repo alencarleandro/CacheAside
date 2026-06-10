@@ -26,11 +26,15 @@ Este projeto foi criado para uma apresentacao de Engenharia de Software sobre **
 
 A aplicacao simula uma API academica de alunos com CRUD completo e mostra, em tempo real, a diferenca entre consultas com cache e sem cache. O foco nao e apenas "ter cache", mas demonstrar o impacto arquitetural em latencia, carga no banco, consistencia e invalidacao.
 
+<p align="center">
+  <img src="img/Site.png" width="1100" alt="Tela do laboratorio Cache Aside com benchmark, dados do Redis e workflow n8n" />
+</p>
+
 ## O Que Da Para Demonstrar
 
 - CRUD REST completo com `POST`, `GET`, `PUT`, `PATCH` e `DELETE`.
 - Cache Aside em consultas frequentes de lista e aluno individual.
-- Toggle para ligar e desligar o cache durante a apresentacao.
+- Controle por aluno para usar cache ou forcar cache miss durante a apresentacao.
 - Benchmark comparando tempo medio com cache e sem cache.
 - Contadores de cache hit, cache miss, leituras no banco e invalidacoes.
 - Invalidação de cache apos escrita para evitar dado antigo.
@@ -39,25 +43,9 @@ A aplicacao simula uma API academica de alunos com CRUD completo e mostra, em te
 
 ## Arquitetura
 
-```mermaid
-flowchart LR
-  UI["React Dashboard"] --> API["Node.js / Express API"]
-  API --> TOGGLE{"Cache ligado?"}
-  TOGGLE -->|"Sim"| CACHE["Redis / Key Value / Memoria"]
-  CACHE -->|"Hit"| API
-  CACHE -->|"Miss"| DB["Postgres / Supabase"]
-  TOGGLE -->|"Nao"| DB
-  DB --> API
-  API --> UI
-
-  classDef red fill:#ffe1dc,stroke:#d92d20,color:#211715;
-  classDef dark fill:#2b211f,stroke:#2b211f,color:#ffffff;
-  classDef soft fill:#fff4f1,stroke:#ead1cc,color:#211715;
-
-  class CACHE,TOGGLE red;
-  class API dark;
-  class UI,DB soft;
-```
+<p align="center">
+  <img src="img/diagramaArquitetural.PNG" width="900" alt="Diagrama arquitetural com Web e Mobile acessando o servico de alunos e o n8n no Render, integrados ao Supabase e Redis" />
+</p>
 
 ## Como o Cache Aside Funciona Aqui
 
