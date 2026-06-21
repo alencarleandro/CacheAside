@@ -79,4 +79,8 @@ services:
       - key: N8N_SECURE_COOKIE
         value: true
       - key: N8N_SAMESITE_COOKIE
-        value: lax
+        value: none
+      - key: N8N_CONTENT_SECURITY_POLICY
+        value: '{"default-src":["''self''"],"script-src":["''self''","''unsafe-inline''","''unsafe-eval''","data:","blob:","https://cdn-rs.n8n.io"],"script-src-elem":["''self''","''unsafe-inline''","''unsafe-eval''","data:","blob:","https://cdn-rs.n8n.io"],"style-src":["''self''","''unsafe-inline''"],"img-src":["''self''","data:","blob:"],"font-src":["''self''","data:"],"connect-src":["''self''","https:","wss:"],"worker-src":["''self''","blob:"],"frame-src":["''self''"],"frame-ancestors":["''self''","https://*.onrender.com","https://cacheaside.onrender.com","http://localhost:8080","http://127.0.0.1:8080","http://127.0.0.1:8081"]}'
+      - key: N8N_DISABLE_UI_SECURITY
+        value: true
