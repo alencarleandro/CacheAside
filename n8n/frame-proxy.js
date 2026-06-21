@@ -37,11 +37,27 @@ function responseHeaders(headers) {
 
   for (const [key, value] of Object.entries(headers)) {
     if (responseHeaderBlocklist.has(key.toLowerCase())) continue;
+
+    if (key.toLowerCase() === 'set-cookie') {
+      const cookies = Array.isArray(value) ? value : [value];
+      nextHeaders[key] = cookies.map((cookie) => {
+        const withoutSameSite = cookie.replace(/;\s*SameSite=[^;]+/gi, '');
+        const secureCookie = /;\s*Secure/i.test(withoutSameSite)
+          ? withoutSameSite
+          : `${withoutSameSite}; Secure`;
+        const partitionedCookie = /;\s*Partitioned/i.test(secureCookie)
+          ? secureCookie
+          : `${secureCookie}; Partitioned`;
+
+        return `${partitionedCookie}; SameSite=None`;
+      });
+      continue;
+    }
+
     nextHeaders[key] = value;
   }
 
   nextHeaders['content-security-policy'] = process.env.N8N_PROXY_CONTENT_SECURITY_POLICY
-    || process.env.N8N_CONTENT_SECURITY_POLICY
     || defaultCsp;
 
   return nextHeaders;
