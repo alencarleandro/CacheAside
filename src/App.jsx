@@ -42,7 +42,7 @@ function formatMs(value) {
   ];
   const unit = units.find((item) => absolute < item.limit);
   const scaled = milliseconds / unit.divisor;
-  const decimals = unit.suffix === 'ms' || Math.abs(scaled) >= 10 ? 1 : 2;
+  const decimals = unit.suffix === 'ms' ? 2 : (Math.abs(scaled) >= 10 ? 1 : 2);
   return `${scaled.toFixed(decimals)} ${unit.suffix}`;
 }
 
