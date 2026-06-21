@@ -7,4 +7,5 @@ USER root
 RUN chmod +x /home/node/start-with-frame-proxy.sh
 USER node
 
-CMD ["sh", "/home/node/start-with-frame-proxy.sh"]
+ENTRYPOINT []
+CMD ["/bin/sh", "/home/node/start-with-frame-proxy.sh"]
