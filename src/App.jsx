@@ -4,7 +4,6 @@ import {
   ChevronUp,
   LayoutDashboard,
   Maximize2,
-  Minimize2,
   Pencil,
   Play,
   Plus,
@@ -175,7 +174,6 @@ function FocusNote({ measure, result }) {
 
 function App() {
   const shellRef = useRef(null);
-  const n8nPanelRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(PAGE_LAB);
   const [students, setStudents] = useState([]);
   const [metrics, setMetrics] = useState(null);
@@ -190,8 +188,6 @@ function App() {
   const [cacheLoading, setCacheLoading] = useState(false);
   const [cacheRefreshing, setCacheRefreshing] = useState(false);
   const [cacheNow, setCacheNow] = useState(() => Date.now());
-  const [n8nFullscreen, setN8nFullscreen] = useState(false);
-  const [n8nLoaded, setN8nLoaded] = useState(false);
   const [studentForm, setStudentForm] = useState(EMPTY_STUDENT_FORM);
   const [editingStudentId, setEditingStudentId] = useState(null);
   const [crudLoading, setCrudLoading] = useState(false);
@@ -276,28 +272,8 @@ function App() {
   }, [cache.entries]);
 
   useEffect(() => {
-    if (!n8nFullscreen) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [n8nFullscreen]);
-
-  useEffect(() => {
     if (currentPage !== PAGE_CRUD) return;
     loadCrudStudents();
-  }, [currentPage]);
-
-  useEffect(() => {
-    if (currentPage === PAGE_LAB) {
-      setN8nLoaded(false);
-      return;
-    }
-
-    setN8nFullscreen(false);
   }, [currentPage]);
 
   useEffect(() => {
@@ -314,28 +290,6 @@ function App() {
 
     return () => window.clearTimeout(scrollReset);
   }, [currentPage]);
-
-  useEffect(() => {
-    if (currentPage !== PAGE_LAB || n8nLoaded) return undefined;
-
-    const root = shellRef.current;
-    const target = n8nPanelRef.current;
-    if (!root || !target || !window.IntersectionObserver) return undefined;
-
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) return;
-      setN8nLoaded(true);
-      observer.disconnect();
-    }, {
-      root,
-      rootMargin: '280px 0px',
-      threshold: 0
-    });
-
-    observer.observe(target);
-
-    return () => observer.disconnect();
-  }, [currentPage, n8nLoaded]);
 
   async function handleAction(action) {
     setLoading(true);
@@ -805,10 +759,7 @@ function App() {
           )}
         </section>
 
-        <section
-          className={`surface consistency-panel ${n8nFullscreen ? 'is-n8n-fullscreen' : ''}`}
-          ref={n8nPanelRef}
-        >
+        <section className="surface consistency-panel">
           <div className="section-heading">
             <div>
               <span className="eyebrow">Tradeoff</span>
@@ -817,30 +768,44 @@ function App() {
             <button
               className="primary-button n8n-fullscreen-toggle"
               type="button"
-              onClick={() => {
-                setN8nLoaded(true);
-                setN8nFullscreen((current) => !current);
-              }}
-              aria-pressed={n8nFullscreen}
-              title={n8nFullscreen ? 'Voltar ao tamanho normal' : 'Expandir n8n em tela cheia'}
+              onClick={() => window.open(N8N_WORKFLOW_URL, '_blank', 'noopener,noreferrer')}
+              title="Abrir workflow no n8n"
             >
-              {n8nFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-              {n8nFullscreen ? 'Voltar' : 'Tela cheia'}
+              <Maximize2 size={18} />
+              Abrir n8n
             </button>
           </div>
           <div className="tradeoff-workflow-shell">
-            {n8nLoaded ? (
-              <iframe
-                title="Workflow n8n do tradeoff"
-                src={N8N_WORKFLOW_URL}
-                loading="lazy"
-                tabIndex={-1}
-              />
-            ) : (
-              <div className="tradeoff-workflow-placeholder">
-                <span>Workflow n8n</span>
+            <div className="tradeoff-workflow-preview" aria-label="Resumo do workflow Cache Aside no n8n">
+              <article className="workflow-lane is-read">
+                <h3>Trade Off</h3>
+                <div className="workflow-nodes">
+                  <span className="workflow-node is-redis">Busca dado cacheado</span>
+                  <span className="workflow-node is-decision">Dado existe?</span>
+                  <span className="workflow-node is-db">Busca dado no banco</span>
+                  <span className="workflow-node is-redis">Guarda dado em cache</span>
+                  <span className="workflow-node is-return">Return</span>
+                </div>
+              </article>
+
+              <div className="workflow-lane-grid">
+                <article className="workflow-lane is-update">
+                  <h3>Atualizacao de cache</h3>
+                  <div className="workflow-nodes is-compact">
+                    <span className="workflow-node is-db">Atualiza dado</span>
+                    <span className="workflow-node is-redis">Atualiza dado em cache</span>
+                  </div>
+                </article>
+
+                <article className="workflow-lane is-invalidate">
+                  <h3>Invalidacao de cache</h3>
+                  <div className="workflow-nodes is-compact">
+                    <span className="workflow-node is-db">Atualiza dado</span>
+                    <span className="workflow-node is-redis">Invalida cache</span>
+                  </div>
+                </article>
               </div>
-            )}
+            </div>
           </div>
         </section>
 
