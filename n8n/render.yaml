@@ -9,11 +9,11 @@ services:
       - key: DB_TYPE
         value: postgresdb
       - key: DATABASE_URL
-        value: 'postgresql://postgres.qyyoaibgniacbbalzjkz:2rEGSmWR9MC6afGb@aws-1-us-west-2.pooler.supabase.com:6543/postgres'
+        value: 'postgresql://postgres.qyyoaibgniacbbalzjkz:2rEGSmWR9MC6afGb@aws-1-us-west-2.pooler.supabase.com:5432/postgres'
       - key: DB_POSTGRESDB_HOST
         value: aws-1-us-west-2.pooler.supabase.com
       - key: DB_POSTGRESDB_PORT
-        value: 6543
+        value: 5432
       - key: DB_POSTGRESDB_DATABASE
         value: postgres
       - key: DB_POSTGRESDB_USER
@@ -32,6 +32,8 @@ services:
         value: 10000
       - key: DB_PING_INTERVAL_SECONDS
         value: 15
+      - key: DB_PING_TIMEOUT_MS
+        value: 60000
 
       - key: N8N_PORT
         value: 5678
@@ -53,8 +55,8 @@ services:
         value: America/Sao_Paulo
       - key: TZ
         value: America/Sao_Paulo
-      - key: N8N_RUNNERS_ENABLED
-        value: false
+      - key: N8N_RUNNERS_GRANT_TOKEN_TTL
+        value: 120
       - key: EXECUTIONS_DATA_SAVE_ON_SUCCESS
         value: none
       - key: EXECUTIONS_DATA_SAVE_ON_ERROR
