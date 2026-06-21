@@ -37,6 +37,8 @@ services:
 
       - key: N8N_PORT
         value: 5678
+      - key: N8N_INTERNAL_PORT
+        value: 5680
       - key: N8N_HOST
         value: n8n-e9qi.onrender.com
       - key: N8N_PROTOCOL
