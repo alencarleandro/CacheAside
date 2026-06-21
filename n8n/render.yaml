@@ -9,11 +9,11 @@ services:
       - key: DB_TYPE
         value: postgresdb
       - key: DATABASE_URL
-        value: 'postgresql://postgres.qyyoaibgniacbbalzjkz:2rEGSmWR9MC6afGb@aws-1-us-west-2.pooler.supabase.com:5432/postgres'
+        value: 'postgresql://postgres.qyyoaibgniacbbalzjkz:2rEGSmWR9MC6afGb@aws-1-us-west-2.pooler.supabase.com:6543/postgres'
       - key: DB_POSTGRESDB_HOST
         value: aws-1-us-west-2.pooler.supabase.com
       - key: DB_POSTGRESDB_PORT
-        value: 5432
+        value: 6543
       - key: DB_POSTGRESDB_DATABASE
         value: postgres
       - key: DB_POSTGRESDB_USER
@@ -36,13 +36,13 @@ services:
       - key: N8N_PORT
         value: 5678
       - key: N8N_HOST
-        value: n8n-kupm.onrender.com
+        value: n8n-e9qi.onrender.com
       - key: N8N_PROTOCOL
         value: https
       - key: N8N_EDITOR_BASE_URL
-        value: https://n8n-kupm.onrender.com
+        value: https://n8n-e9qi.onrender.com
       - key: WEBHOOK_URL
-        value: https://n8n-kupm.onrender.com/
+        value: https://n8n-e9qi.onrender.com/
       - key: N8N_PROXY_HOPS
         value: 1
       - key: NODE_ENV

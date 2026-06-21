@@ -18,7 +18,7 @@ import { apiFetch, CACHE_UPDATED_EVENT } from './api.js';
 import CacheAsideMark from './CacheAsideMark.jsx';
 
 const INITIAL_BENCHMARK_REPETITIONS = 1;
-const N8N_WORKFLOW_URL = 'https://n8n-kupm.onrender.com/workflow/FkPxNsosR7w6MQww';
+const N8N_WORKFLOW_URL = 'https://n8n-e9qi.onrender.com/workflow/FkPxNsosR7w6MQww';
 const PAGE_LAB = 'telaLaboratorio';
 const PAGE_CRUD = 'crud';
 const EMPTY_STUDENT_FORM = {
